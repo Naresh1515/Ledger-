@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Ledger — Daily Expense Tracker</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0F1512">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.44.0/iconfont/tabler-icons.min.css">
+<style>
+  :root{
+    --ink:#0F1512; --surface:#161F1B; --surface-2:#1D2822; --paper:#EFE9D8; --paper-dim:#B9B29C;
+    --sage:#8AAD7F; --sage-dim:#5C7A54; --rust:#D9723A; --rust-dim:#8C4420; --gold:#CBA135;
+    --line:#2B362F; --line-soft:#232E28;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  body{margin:0;background:var(--ink);color:var(--paper);font-family:'Inter',sans-serif;overscroll-behavior:none;}
+  .app{max-width:420px;margin:0 auto;min-height:100vh;background:var(--ink);position:relative;padding-bottom:84px;}
+
+  /* ===== Lock screen ===== */
+  .lock{position:fixed;inset:0;background:var(--ink);z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;}
+  .lock-icon{width:56px;height:56px;border-radius:14px;background:var(--surface);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:26px;color:var(--gold);margin-bottom:18px;}
+  .lock h2{font-family:'Fraunces',serif;font-weight:500;font-size:19px;margin:0 0 4px;}
+  .lock p{color:var(--paper-dim);font-size:13px;margin:0 0 26px;text-align:center;max-width:260px;}
+  .dots{display:flex;gap:14px;margin-bottom:30px;}
+  .dot{width:14px;height:14px;border-radius:50%;border:1px solid var(--line);background:var(--surface);transition:background .15s;}
+  .dot.filled{background:var(--sage);border-color:var(--sage);}
+  .dot.err{background:var(--rust);border-color:var(--rust);}
+  .keypad{display:grid;grid-template-columns:repeat(3,64px);gap:14px;}
+  .key{width:64px;height:64px;border-radius:50%;background:var(--surface);border:1px solid var(--line-soft);color:var(--paper);font-family:'Fraunces',serif;font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+  .key:active{background:var(--surface-2);transform:scale(0.96);}
+  .key.fn{color:var(--paper-dim);font-size:18px;background:none;border:none;}
+  .lock-err{color:var(--rust);font-size:12px;font-family:'IBM Plex Mono',monospace;height:16px;margin-top:8px;}
+  .lock-alt{margin-top:20px;background:none;border:none;color:var(--sage);font-size:12px;font-family:'IBM Plex Mono',monospace;cursor:pointer;}
+
+  /* ===== Header ===== */
+  .header{padding:28px 20px 18px;border-bottom:1px solid var(--line-soft);}
+  .header-top{display:flex;justify-content:space-between;align-items:flex-start;}
+  .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--paper-dim);}
+  .header h1{font-family:'Fraunces',serif;font-weight:500;font-size:22px;margin:4px 0 0;}
+  .header-icons{display:flex;gap:8px;align-items:center;}
+  .icon-btn{background:none;border:1px solid var(--line);color:var(--paper-dim);width:30px;height:30px;border-radius:7px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  .month-nav{display:flex;align-items:center;gap:6px;margin-top:12px;}
+  .month-nav button{background:none;border:1px solid var(--line);color:var(--paper-dim);width:28px;height:28px;border-radius:6px;font-size:14px;cursor:pointer;}
+  .month-nav span{font-family:'IBM Plex Mono',monospace;font-size:12px;flex:1;text-align:center;}
+
+  /* ===== Hero ===== */
+  .hero{padding:22px 20px 10px;}
+  .hero-label{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--paper-dim);letter-spacing:0.08em;text-transform:uppercase;}
+  .hero-amount{font-family:'Fraunces',serif;font-weight:500;font-size:46px;line-height:1.1;margin:6px 0 2px;font-variant-numeric:tabular-nums;}
+  .hero-sub{font-size:13px;color:var(--paper-dim);}
+  .hero-sub b{color:var(--sage);font-weight:600;}
+  .hero-sub.over b{color:var(--rust);}
+
+  .ring-row{display:flex;gap:12px;padding:16px 20px 4px;}
+  .ring-card{flex:1;background:var(--surface);border-radius:12px;padding:14px;border:1px solid var(--line-soft);}
+  .ring-card .rlabel{font-size:11px;color:var(--paper-dim);font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;}
+  .ring-card .rval{font-family:'Fraunces',serif;font-size:22px;margin-top:4px;font-variant-numeric:tabular-nums;}
+  .ring-card.warn .rval{color:var(--gold);}
+  .ring-card.danger .rval{color:var(--rust);}
+
+  .section{padding:22px 20px 4px;}
+  .section-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;}
+  .section-title{font-family:'Fraunces',serif;font-size:17px;font-weight:500;}
+  .section-link{font-size:12px;color:var(--sage);font-family:'IBM Plex Mono',monospace;background:none;border:none;cursor:pointer;}
+
+  .ledger-row{margin-bottom:16px;}
+  .ledger-top{display:flex;align-items:baseline;font-family:'IBM Plex Mono',monospace;font-size:13px;margin-bottom:6px;}
+  .ledger-name{display:flex;align-items:center;gap:8px;color:var(--paper);}
+  .ledger-name i{font-size:15px;color:var(--paper-dim);}
+  .ledger-dots{flex:1;border-bottom:1px dotted var(--line);margin:0 8px 3px;}
+  .ledger-amt{color:var(--paper-dim);white-space:nowrap;}
+  .ledger-amt b{color:var(--paper);font-weight:500;}
+  .ledger-track{height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden;position:relative;}
+  .ledger-fill{height:100%;border-radius:3px;background:var(--sage);transition:width .3s;}
+  .ledger-fill.warn{background:var(--gold);}
+  .ledger-fill.over{background:var(--rust);}
+
+  .alert{display:flex;gap:10px;align-items:flex-start;background:var(--surface);border:1px solid var(--rust-dim);border-left:3px solid var(--rust);border-radius:0 10px 10px 0;padding:11px 13px;margin-bottom:10px;}
+  .alert.watch{border-left-color:var(--gold);border-color:#5C4A1B;}
+  .alert i{color:var(--rust);font-size:17px;margin-top:1px;}
+  .alert.watch i{color:var(--gold);}
+  .alert-text{font-size:13px;line-height:1.4;}
+  .alert-text b{font-weight:600;}
+  .alert-sub{font-size:11px;color:var(--paper-dim);margin-top:2px;font-family:'IBM Plex Mono',monospace;}
+  .empty-alert{font-size:13px;color:var(--paper-dim);font-style:italic;padding:6px 2px 16px;}
+
+  .txn{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line-soft);}
+  .txn:last-child{border-bottom:none;}
+  .txn-icon{width:34px;height:34px;border-radius:9px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;color:var(--paper-dim);font-size:16px;flex-shrink:0;}
+  .txn-mid{flex:1;min-width:0;}
+  .txn-title{font-size:14px;color:var(--paper);}
+  .txn-meta{font-size:11px;color:var(--paper-dim);font-family:'IBM Plex Mono',monospace;margin-top:1px;}
+  .txn-amt{font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:500;white-space:nowrap;}
+  .txn-del{background:none;border:none;color:var(--paper-dim);font-size:15px;cursor:pointer;padding:4px;flex-shrink:0;}
+
+  .fab{position:fixed;bottom:84px;right:calc(50% - 210px + 20px);width:54px;height:54px;border-radius:50%;background:var(--gold);color:var(--ink);border:none;font-size:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,0.4);z-index:20;}
+  @media (max-width:460px){.fab{right:20px;}}
+  .fab:active{transform:scale(0.95);}
+
+  .bottomnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:420px;background:var(--surface);border-top:1px solid var(--line-soft);display:flex;z-index:15;padding-bottom:env(safe-area-inset-bottom);}
+  .navbtn{flex:1;background:none;border:none;color:var(--paper-dim);padding:11px 0 9px;font-size:10px;font-family:'IBM Plex Mono',monospace;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;letter-spacing:0.03em;}
+  .navbtn i{font-size:19px;}
+  .navbtn.active{color:var(--sage);}
+
+  .view{display:none;}
+  .view.active{display:block;}
+
+  .sheet-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.55);display:none;align-items:flex-end;justify-content:center;z-index:30;}
+  .sheet-backdrop.open{display:flex;}
+  .sheet{width:100%;max-width:420px;background:var(--surface);border-radius:18px 18px 0 0;padding:20px 20px 26px;border-top:1px solid var(--line);max-height:88vh;overflow-y:auto;}
+  .sheet h3{font-family:'Fraunces',serif;font-weight:500;font-size:18px;margin:0 0 16px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:11px;color:var(--paper-dim);font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;}
+  .field input, .field select{width:100%;background:var(--surface-2);border:1px solid var(--line);color:var(--paper);border-radius:8px;padding:10px 12px;font-size:15px;font-family:'Inter',sans-serif;}
+  .field input:focus, .field select:focus{outline:none;border-color:var(--sage);}
+  .cat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+  .cat-pick{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 4px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;color:var(--paper-dim);font-size:10px;}
+  .cat-pick i{font-size:17px;}
+  .cat-pick.sel{border-color:var(--sage);color:var(--sage);background:rgba(138,173,127,0.1);}
+  .sheet-actions{display:flex;gap:10px;margin-top:18px;}
+  .btn{flex:1;padding:12px;border-radius:9px;border:1px solid var(--line);background:none;color:var(--paper-dim);font-family:'Inter',sans-serif;font-size:14px;font-weight:500;cursor:pointer;}
+  .btn.primary{background:var(--sage);border-color:var(--sage);color:#0F1512;}
+  .btn.danger{border-color:var(--rust-dim);color:var(--rust);}
+
+  .budget-edit{background:var(--surface);border:1px solid var(--line-soft);border-radius:12px;padding:14px;margin-bottom:12px;}
+  .budget-edit-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+  .budget-edit-top span{display:flex;align-items:center;gap:8px;font-size:14px;}
+  .budget-edit input{width:100px;text-align:right;background:var(--surface-2);border:1px solid var(--line);color:var(--paper);border-radius:6px;padding:6px 8px;font-family:'IBM Plex Mono',monospace;font-size:13px;}
+  .security-row{display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--line-soft);border-radius:12px;padding:14px;margin-bottom:12px;}
+  .security-row div span{display:block;font-size:14px;}
+  .security-row div small{color:var(--paper-dim);font-size:11px;font-family:'IBM Plex Mono',monospace;}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);}
+</style>
+</head>
+<body>
+<div class="app" id="appRoot" style="display:none;">
+
+  <div class="header">
+    <div class="header-top">
+      <div>
+        <div class="eyebrow">Daily ledger</div>
+        <h1>Spending</h1>
+      </div>
+      <div class="header-icons">
+        <button class="icon-btn" id="lockNowBtn" aria-label="Lock app"><i class="ti ti-lock"></i></button>
+      </div>
+    </div>
+    <div class="month-nav">
+      <button id="prevMonth" aria-label="Previous month"><i class="ti ti-chevron-left"></i></button>
+      <span id="monthLabel">—</span>
+      <button id="nextMonth" aria-label="Next month"><i class="ti ti-chevron-right"></i></button>
+    </div>
+  </div>
+
+  <div class="view active" id="view-dashboard">
+    <div class="hero">
+      <div class="hero-label">Spent this month</div>
+      <div class="hero-amount" id="heroAmount">₹0</div>
+      <div class="hero-sub" id="heroSub">Set a monthly target to track progress.</div>
+    </div>
+    <div class="ring-row">
+      <div class="ring-card" id="targetCard">
+        <div class="rlabel">Monthly target</div>
+        <div class="rval" id="targetVal">—</div>
+      </div>
+      <div class="ring-card" id="remainCard">
+        <div class="rlabel">Remaining</div>
+        <div class="rval" id="remainVal">—</div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-head"><div class="section-title">Alerts</div></div>
+      <div id="alertsList"></div>
+    </div>
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">By category</div>
+        <button class="section-link" id="goBudgets">edit targets</button>
+      </div>
+      <div id="categoryLedger"></div>
+    </div>
+    <div class="section">
+      <div class="section-head"><div class="section-title">Recent</div></div>
+      <div id="recentList"></div>
+    </div>
+  </div>
+
+  <div class="view" id="view-budgets">
+    <div class="section">
+      <div class="section-head"><div class="section-title">Monthly target</div></div>
+      <div class="budget-edit">
+        <div class="budget-edit-top">
+          <span><i class="ti ti-target-arrow"></i> Overall target</span>
+          <input type="number" id="overallTargetInput" placeholder="0">
+        </div>
+      </div>
+      <div class="section-head" style="margin-top:8px;"><div class="section-title">Category targets</div></div>
+      <div id="budgetEditList"></div>
+      <button class="btn primary" id="saveBudgets" style="width:100%;margin-top:6px;">Save targets</button>
+    </div>
+  </div>
+
+  <div class="view" id="view-all">
+    <div class="section">
+      <div class="section-head"><div class="section-title">All transactions</div></div>
+      <div id="allTxnList"></div>
+    </div>
+  </div>
+
+  <div class="view" id="view-security">
+    <div class="section">
+      <div class="section-head"><div class="section-title">Security</div></div>
+      <div class="security-row">
+        <div><span>App lock</span><small>PIN required on open</small></div>
+        <button class="btn" id="changePinBtn" style="flex:none;padding:8px 14px;">Change PIN</button>
+      </div>
+      <div class="security-row">
+        <div><span>Data encryption</span><small>AES-256, key derived from your PIN</small></div>
+        <i class="ti ti-shield-check" style="color:var(--sage);font-size:20px;"></i>
+      </div>
+      <button class="btn danger" id="resetAppBtn" style="width:100%;">Reset app and erase all data</button>
+    </div>
+  </div>
+
+  <button class="fab" id="fabAdd" aria-label="Add expense"><i class="ti ti-plus"></i></button>
+
+  <div class="bottomnav">
+    <button class="navbtn active" data-view="dashboard"><i class="ti ti-layout-dashboard"></i>Dashboard</button>
+    <button class="navbtn" data-view="all"><i class="ti ti-list"></i>History</button>
+    <button class="navbtn" data-view="budgets"><i class="ti ti-target-arrow"></i>Targets</button>
+    <button class="navbtn" data-view="security"><i class="ti ti-shield-lock"></i>Security</button>
+  </div>
+</div>
+
+<div class="sheet-backdrop" id="addBackdrop">
+  <div class="sheet">
+    <h3>Add expense</h3>
+    <div class="field"><label>Amount</label><input type="number" id="inAmount" placeholder="0" inputmode="decimal"></div>
+    <div class="field"><label>Note</label><input type="text" id="inNote" placeholder="Coffee, groceries, cab..."></div>
+    <div class="field"><label>Category</label><div class="cat-grid" id="catGrid"></div></div>
+    <div class="sheet-actions">
+      <button class="btn" id="cancelAdd">Cancel</button>
+      <button class="btn primary" id="confirmAdd">Save expense</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Lock screen ===== -->
+<div class="lock" id="lockScreen">
+  <div class="lock-icon"><i class="ti ti-lock" id="lockIconEl"></i></div>
+  <h2 id="lockTitle">Create your PIN</h2>
+  <p id="lockSub">Choose a 4-digit PIN to encrypt and protect your ledger.</p>
+  <div class="dots" id="pinDots">
+    <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+  </div>
+  <div class="keypad" id="keypad">
+    <button class="key" data-k="1">1</button><button class="key" data-k="2">2</button><button class="key" data-k="3">3</button>
+    <button class="key" data-k="4">4</button><button class="key" data-k="5">5</button><button class="key" data-k="6">6</button>
+    <button class="key" data-k="7">7</button><button class="key" data-k="8">8</button><button class="key" data-k="9">9</button>
+    <button class="key fn" id="keyClear">clear</button><button class="key" data-k="0">0</button><button class="key fn" id="keyBack"><i class="ti ti-backspace"></i></button>
+  </div>
+  <div class="lock-err" id="lockErr"></div>
+</div>
+
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=> navigator.serviceWorker.register('service-worker.js').catch(()=>{}));
+}
+
+/* ================= Local storage shim =================
+   Real, on-device persistence using IndexedDB (falls back to
+   localStorage). Everything written here is already AES-encrypted
+   by the app before it reaches this layer, except the salt (which
+   is not secret on its own — it's a public parameter of PBKDF2). */
+window.storage = (function(){
+  const DB_NAME = 'ledger-db', STORE = 'kv';
+  let dbPromise = null;
+  function openDb(){
+    if(dbPromise) return dbPromise;
+    dbPromise = new Promise((resolve)=>{
+      if(!('indexedDB' in window)){ resolve(null); return; }
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore(STORE);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+    });
+    return dbPromise;
+  }
+  async function idbGet(key){
+    const db = await openDb();
+    if(!db) return localStorage.getItem(key);
+    return new Promise((resolve)=>{
+      const tx = db.transaction(STORE,'readonly').objectStore(STORE).get(key);
+      tx.onsuccess = () => resolve(tx.result ?? null);
+      tx.onerror = () => resolve(null);
+    });
+  }
+  async function idbSet(key, value){
+    const db = await openDb();
+    if(!db){ localStorage.setItem(key, value); return; }
+    return new Promise((resolve)=>{
+      const tx = db.transaction(STORE,'readwrite').objectStore(STORE).put(value, key);
+      tx.onsuccess = () => resolve();
+      tx.onerror = () => resolve();
+    });
+  }
+  async function idbDelete(key){
+    const db = await openDb();
+    if(!db){ localStorage.removeItem(key); return; }
+    return new Promise((resolve)=>{
+      const tx = db.transaction(STORE,'readwrite').objectStore(STORE).delete(key);
+      tx.onsuccess = () => resolve();
+      tx.onerror = () => resolve();
+    });
+  }
+  return {
+    async get(key){
+      const value = await idbGet(key);
+      if(value === null || value === undefined) throw new Error('not found');
+      return { key, value, shared:false };
+    },
+    async set(key, value){
+      await idbSet(key, value);
+      return { key, value, shared:false };
+    },
+    async delete(key){
+      await idbDelete(key);
+      return { key, deleted:true, shared:false };
+    }
+  };
+})();
+
+const CATEGORIES = [
+  {id:'food', label:'Food', icon:'ti-tools-kitchen-2'},
+  {id:'transport', label:'Transport', icon:'ti-car'},
+  {id:'shopping', label:'Shopping', icon:'ti-shopping-bag'},
+  {id:'bills', label:'Bills', icon:'ti-file-invoice'},
+  {id:'health', label:'Health', icon:'ti-heart-rate-monitor'},
+  {id:'fun', label:'Fun', icon:'ti-movie'},
+  {id:'home', label:'Home', icon:'ti-home'},
+  {id:'other', label:'Other', icon:'ti-dots'}
+];
+const DEFAULT_TARGETS = {overall:30000, food:8000, transport:4000, shopping:5000, bills:6000, health:2000, fun:3000, home:3000, other:2000};
+
+let state = { txns: [], targets: {...DEFAULT_TARGETS} };
+let currentMonth = new Date();
+let selectedCat = 'food';
+
+/* ================= Encryption layer ================= */
+/* PIN never stored. A PBKDF2-derived AES-GCM key is held only in memory
+   for the session. A random salt + a small "verifier" ciphertext are
+   stored so a re-entered PIN can be checked without keeping the PIN itself. */
+let cryptoKey = null;
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+const b64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
+const unb64 = str => Uint8Array.from(atob(str), c => c.charCodeAt(0));
+
+async function deriveKey(pin, saltB64){
+  const salt = unb64(saltB64);
+  const baseKey = await crypto.subtle.importKey('raw', enc.encode(pin), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    {name:'PBKDF2', salt, iterations:150000, hash:'SHA-256'},
+    baseKey, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']
+  );
+}
+async function encryptStr(plain){
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const buf = await crypto.subtle.encrypt({name:'AES-GCM', iv}, cryptoKey, enc.encode(plain));
+  return b64(iv) + '.' + b64(buf);
+}
+async function decryptStr(payload){
+  const [ivB64, dataB64] = payload.split('.');
+  const iv = unb64(ivB64);
+  const buf = await crypto.subtle.decrypt({name:'AES-GCM', iv}, cryptoKey, unb64(dataB64));
+  return dec.decode(buf);
+}
+function newSalt(){ return b64(crypto.getRandomValues(new Uint8Array(16))); }
+
+/* ================= Lock screen flow ================= */
+let mode = null; // 'create' | 'unlock' | 'changing'
+let pinBuffer = '';
+let firstPinEntry = null;
+let failCount = 0;
+
+const lockScreen = document.getElementById('lockScreen');
+const lockTitle = document.getElementById('lockTitle');
+const lockSub = document.getElementById('lockSub');
+const lockErr = document.getElementById('lockErr');
+const lockIconEl = document.getElementById('lockIconEl');
+const appRoot = document.getElementById('appRoot');
+
+function renderDots(){
+  document.querySelectorAll('#pinDots .dot').forEach((d,i)=>{
+    d.className = 'dot' + (i < pinBuffer.length ? ' filled' : '');
+  });
+}
+function shakeErr(msg){
+  lockErr.textContent = msg;
+  pinBuffer = '';
+  renderDots();
+  document.querySelectorAll('#pinDots .dot').forEach(d=>d.classList.add('err'));
+  setTimeout(()=> document.querySelectorAll('#pinDots .dot').forEach(d=>d.classList.remove('err')), 300);
+}
+
+document.getElementById('keypad').addEventListener('click', async (e)=>{
+  const btn = e.target.closest('button');
+  if(!btn) return;
+  if(btn.id === 'keyClear'){ pinBuffer=''; renderDots(); return; }
+  if(btn.id === 'keyBack'){ pinBuffer = pinBuffer.slice(0,-1); renderDots(); return; }
+  const k = btn.getAttribute('data-k');
+  if(k==null || pinBuffer.length>=4) return;
+  pinBuffer += k;
+  renderDots();
+  if(pinBuffer.length===4) await onPinComplete();
+});
+
+async function onPinComplete(){
+  lockErr.textContent='';
+  if(mode==='create' || mode==='changing'){
+    if(firstPinEntry===null){
+      firstPinEntry = pinBuffer;
+      pinBuffer='';
+      renderDots();
+      lockTitle.textContent = 'Confirm your PIN';
+      lockSub.textContent = 'Enter it again to confirm.';
+      return;
+    }
+    if(pinBuffer !== firstPinEntry){
+      shakeErr('PINs did not match — start over');
+      firstPinEntry = null;
+      lockTitle.textContent = mode==='changing' ? 'Choose a new PIN' : 'Create your PIN';
+      lockSub.textContent = mode==='changing' ? 'This re-encrypts your data.' : 'Choose a 4-digit PIN to encrypt and protect your ledger.';
+      return;
+    }
+    // set up: derive key, encrypt everything with new key
+    const salt = newSalt();
+    cryptoKey = await deriveKey(firstPinEntry, salt);
+    await window.storage.set('salt', salt, false);
+    await window.storage.set('verifier', await encryptStr('unlocked'), false);
+    await persistAll(); // re-encrypt current state under new key
+    unlockAndShowApp();
+  } else if(mode==='unlock'){
+    try{
+      const saltRes = await window.storage.get('salt', false);
+      const testKey = await deriveKey(pinBuffer, saltRes.value);
+      const verRes = await window.storage.get('verifier', false);
+      cryptoKey = testKey;
+      const check = await decryptStr(verRes.value);
+      if(check!=='unlocked') throw new Error('bad');
+      failCount = 0;
+      await loadEncryptedState();
+      unlockAndShowApp();
+    }catch(err){
+      failCount++;
+      cryptoKey = null;
+      shakeErr(failCount>=3 ? 'Incorrect PIN — check and try again' : 'Incorrect PIN');
+    }
+  }
+}
+
+function unlockAndShowApp(){
+  lockScreen.style.display='none';
+  appRoot.style.display='block';
+  render();
+}
+
+document.getElementById('lockNowBtn').onclick = ()=>{
+  appRoot.style.display='none';
+  lockScreen.style.display='flex';
+  lockIconEl.className='ti ti-lock';
+  lockTitle.textContent='Enter your PIN';
+  lockSub.textContent='Unlock your ledger.';
+  lockErr.textContent='';
+  pinBuffer=''; firstPinEntry=null; mode='unlock';
+  renderDots();
+};
+
+document.getElementById('changePinBtn').onclick = ()=>{
+  mode='changing'; firstPinEntry=null; pinBuffer='';
+  lockTitle.textContent='Choose a new PIN';
+  lockSub.textContent='This re-encrypts your data.';
+  lockErr.textContent='';
+  appRoot.style.display='none';
+  lockScreen.style.display='flex';
+  renderDots();
+};
+
+document.getElementById('resetAppBtn').onclick = async ()=>{
+  if(!confirm('This permanently deletes all expenses, targets, and your PIN. Continue?')) return;
+  try{ await window.storage.delete('salt', false); }catch(e){}
+  try{ await window.storage.delete('verifier', false); }catch(e){}
+  try{ await window.storage.delete('txns_enc', false); }catch(e){}
+  try{ await window.storage.delete('targets_enc', false); }catch(e){}
+  location.reload();
+};
+
+/* ================= Encrypted persistence ================= */
+async function persistAll(){
+  await window.storage.set('txns_enc', await encryptStr(JSON.stringify(state.txns)), false);
+  await window.storage.set('targets_enc', await encryptStr(JSON.stringify(state.targets)), false);
+}
+async function saveTxns(){
+  await window.storage.set('txns_enc', await encryptStr(JSON.stringify(state.txns)), false);
+}
+async function saveTargets(){
+  await window.storage.set('targets_enc', await encryptStr(JSON.stringify(state.targets)), false);
+}
+async function loadEncryptedState(){
+  try{
+    const t = await window.storage.get('txns_enc', false);
+    if(t) state.txns = JSON.parse(await decryptStr(t.value));
+  }catch(e){}
+  try{
+    const g = await window.storage.get('targets_enc', false);
+    if(g) state.targets = JSON.parse(await decryptStr(g.value));
+  }catch(e){}
+}
+
+/* ================= Boot ================= */
+async function boot(){
+  let hasSalt = false;
+  try{
+    const s = await window.storage.get('salt', false);
+    hasSalt = !!s;
+  }catch(e){ hasSalt = false; }
+
+  if(!hasSalt){
+    mode='create'; firstPinEntry=null;
+    lockTitle.textContent='Create your PIN';
+    lockSub.textContent='Choose a 4-digit PIN to encrypt and protect your ledger.';
+  } else {
+    mode='unlock';
+    lockTitle.textContent='Enter your PIN';
+    lockSub.textContent='Unlock your ledger.';
+  }
+  renderDots();
+}
+boot();
+
+/* Re-lock whenever the app is backgrounded or hidden */
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden && appRoot.style.display==='block'){
+    document.getElementById('lockNowBtn').click();
+  }
+});
+
+/* ================= App logic (dashboard, budgets, txns) ================= */
+const fmt = n => '₹' + Math.round(n).toLocaleString('en-IN');
+const monthKey = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+const monthLabelStr = d => d.toLocaleDateString('en-US',{month:'short',year:'numeric'});
+function txnsForMonth(){ const mk = monthKey(currentMonth); return state.txns.filter(t => t.date.startsWith(mk)); }
+function catInfo(id){ return CATEGORIES.find(c=>c.id===id) || CATEGORIES[CATEGORIES.length-1]; }
+
+function render(){
+  document.getElementById('monthLabel').textContent = monthLabelStr(currentMonth);
+  const monthTxns = txnsForMonth();
+  const total = monthTxns.reduce((s,t)=>s+t.amount,0);
+  const target = state.targets.overall || 0;
+  const remain = target - total;
+  const pct = target ? total/target : 0;
+
+  document.getElementById('heroAmount').textContent = fmt(total);
+  const sub = document.getElementById('heroSub');
+  if(target>0){
+    if(remain>=0){ sub.className='hero-sub'; sub.innerHTML = `<b>${fmt(remain)}</b> left of ${fmt(target)} target`; }
+    else { sub.className='hero-sub over'; sub.innerHTML = `<b>${fmt(-remain)}</b> over your ${fmt(target)} target`; }
+  } else { sub.className='hero-sub'; sub.textContent = 'Set a monthly target to track progress.'; }
+
+  document.getElementById('targetVal').textContent = target ? fmt(target) : '—';
+  const remainCard = document.getElementById('remainCard');
+  document.getElementById('remainVal').textContent = target ? fmt(Math.max(remain,0)) : '—';
+  remainCard.className = 'ring-card' + (target && pct>=1 ? ' danger' : target && pct>=0.85 ? ' warn' : '');
+
+  const alertsEl = document.getElementById('alertsList');
+  let alerts = [];
+  if(target>0){
+    if(pct>=1) alerts.push({type:'over', text:`Over your monthly target by <b>${fmt(-remain)}</b>`, sub:`${Math.round(pct*100)}% of ${fmt(target)} used`});
+    else if(pct>=0.85) alerts.push({type:'watch', text:`Approaching monthly target — <b>${Math.round(pct*100)}%</b> used`, sub:`${fmt(remain)} remaining this month`});
+  }
+  CATEGORIES.forEach(c=>{
+    const spent = monthTxns.filter(t=>t.category===c.id).reduce((s,t)=>s+t.amount,0);
+    const catTarget = state.targets[c.id] || 0;
+    if(catTarget>0 && spent>catTarget) alerts.push({type:'over', text:`<b>${c.label}</b> is over target by ${fmt(spent-catTarget)}`, sub:`${fmt(spent)} spent of ${fmt(catTarget)}`});
+  });
+  alertsEl.innerHTML = alerts.length===0
+    ? `<div class="empty-alert">No alerts — spending is on track.</div>`
+    : alerts.map(a=>`<div class="alert ${a.type==='watch'?'watch':''}"><i class="ti ${a.type==='watch'?'ti-alert-triangle':'ti-alert-octagon'}"></i><div class="alert-text">${a.text}<div class="alert-sub">${a.sub}</div></div></div>`).join('');
+
+  const ledgerEl = document.getElementById('categoryLedger');
+  const catsWithSpend = CATEGORIES.map(c=>{
+    const spent = monthTxns.filter(t=>t.category===c.id).reduce((s,t)=>s+t.amount,0);
+    return {...c, spent, target: state.targets[c.id]||0};
+  }).filter(c=>c.spent>0 || c.target>0).sort((a,b)=>b.spent-a.spent);
+  ledgerEl.innerHTML = catsWithSpend.length===0
+    ? `<div class="empty-alert">No spending recorded yet this month.</div>`
+    : catsWithSpend.map(c=>{
+        const p = c.target ? Math.min(c.spent/c.target,1) : (c.spent>0?1:0);
+        const cls = !c.target ? '' : (c.spent>c.target ? 'over' : (c.spent/c.target>=0.85 ? 'warn' : ''));
+        return `<div class="ledger-row"><div class="ledger-top"><span class="ledger-name"><i class="ti ${c.icon}"></i>${c.label}</span><span class="ledger-dots"></span><span class="ledger-amt"><b>${fmt(c.spent)}</b>${c.target?' / '+fmt(c.target):''}</span></div><div class="ledger-track"><div class="ledger-fill ${cls}" style="width:${p*100}%"></div></div></div>`;
+      }).join('');
+
+  const recentEl = document.getElementById('recentList');
+  const recent = [...monthTxns].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5);
+  recentEl.innerHTML = recent.length===0 ? `<div class="empty-alert">No expenses logged yet. Tap + to add one.</div>` : recent.map(txnRowHtml).join('');
+
+  const allEl = document.getElementById('allTxnList');
+  const allSorted = [...monthTxns].sort((a,b)=>b.date.localeCompare(a.date));
+  allEl.innerHTML = allSorted.length===0 ? `<div class="empty-alert">No expenses logged this month.</div>` : allSorted.map(txnRowHtml).join('');
+
+  document.getElementById('overallTargetInput').value = state.targets.overall || '';
+  document.getElementById('budgetEditList').innerHTML = CATEGORIES.map(c=>`<div class="budget-edit"><div class="budget-edit-top"><span><i class="ti ${c.icon}"></i>${c.label}</span><input type="number" data-cat="${c.id}" class="catTargetInput" value="${state.targets[c.id]||''}" placeholder="0"></div></div>`).join('');
+
+  attachTxnDeleteHandlers();
+}
+
+function txnRowHtml(t){
+  const c = catInfo(t.category);
+  const d = new Date(t.date);
+  const dateStr = d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  return `<div class="txn"><div class="txn-icon"><i class="ti ${c.icon}"></i></div><div class="txn-mid"><div class="txn-title">${t.note || c.label}</div><div class="txn-meta">${c.label} · ${dateStr}</div></div><div class="txn-amt">${fmt(t.amount)}</div><button class="txn-del" data-id="${t.id}" aria-label="Delete expense"><i class="ti ti-trash"></i></button></div>`;
+}
+function attachTxnDeleteHandlers(){
+  document.querySelectorAll('.txn-del').forEach(btn=>{
+    btn.onclick = async ()=>{
+      state.txns = state.txns.filter(t=>t.id!==btn.getAttribute('data-id'));
+      await saveTxns();
+      render();
+    };
+  });
+}
+
+document.getElementById('catGrid').innerHTML = CATEGORIES.map(c=>`<div class="cat-pick ${c.id===selectedCat?'sel':''}" data-cat="${c.id}"><i class="ti ${c.icon}"></i>${c.label}</div>`).join('');
+document.querySelectorAll('.cat-pick').forEach(el=>{
+  el.onclick = ()=>{ selectedCat = el.getAttribute('data-cat'); document.querySelectorAll('.cat-pick').forEach(x=>x.classList.remove('sel')); el.classList.add('sel'); };
+});
+
+document.querySelectorAll('.navbtn').forEach(btn=>{
+  btn.onclick = ()=>{
+    document.querySelectorAll('.navbtn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.view').forEach(vv=>vv.classList.remove('active'));
+    document.getElementById('view-'+btn.getAttribute('data-view')).classList.add('active');
+  };
+});
+document.getElementById('goBudgets').onclick = ()=> document.querySelector('.navbtn[data-view="budgets"]').click();
+
+document.getElementById('prevMonth').onclick = ()=>{ currentMonth.setMonth(currentMonth.getMonth()-1); render(); };
+document.getElementById('nextMonth').onclick = ()=>{ currentMonth.setMonth(currentMonth.getMonth()+1); render(); };
+
+const addBackdrop = document.getElementById('addBackdrop');
+document.getElementById('fabAdd').onclick = ()=>{
+  document.getElementById('inAmount').value='';
+  document.getElementById('inNote').value='';
+  addBackdrop.classList.add('open');
+};
+document.getElementById('cancelAdd').onclick = ()=> addBackdrop.classList.remove('open');
+addBackdrop.onclick = (e)=>{ if(e.target===addBackdrop) addBackdrop.classList.remove('open'); };
+document.getElementById('confirmAdd').onclick = async ()=>{
+  const amount = parseFloat(document.getElementById('inAmount').value);
+  if(!amount || amount<=0) return;
+  const note = document.getElementById('inNote').value.trim();
+  const now = new Date();
+  const dateStr = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+  state.txns.push({id: Date.now().toString(36)+Math.random().toString(36).slice(2,6), amount, note, category: selectedCat, date: dateStr});
+  await saveTxns();
+  addBackdrop.classList.remove('open');
+  render();
+};
+
+document.getElementById('saveBudgets').onclick = async ()=>{
+  state.targets.overall = parseFloat(document.getElementById('overallTargetInput').value) || 0;
+  document.querySelectorAll('.catTargetInput').forEach(inp=>{ state.targets[inp.getAttribute('data-cat')] = parseFloat(inp.value) || 0; });
+  await saveTargets();
+  render();
+  document.querySelector('.navbtn[data-view="dashboard"]').click();
+};
+</script>
+</body>
+</html>
