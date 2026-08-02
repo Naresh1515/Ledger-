@@ -264,7 +264,8 @@
     </div>
     <div class="month-nav">
       <button id="prevMonth" aria-label="Previous month"><i class="ti ti-chevron-left"></i></button>
-      <span id="monthLabel">—</span>
+      <span id="monthLabel" style="cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;"><i class="ti ti-calendar" style="font-size:13px;"></i><span id="monthLabelText">—</span></span>
+      <input type="month" id="monthPicker" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none;">
       <button id="nextMonth" aria-label="Next month"><i class="ti ti-chevron-right"></i></button>
     </div>
   </div>
@@ -347,10 +348,12 @@
       <button class="chip" data-t="investment">Investment</button>
     </div>
     <div class="section" style="padding-top:12px;">
-      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
         <button class="btn primary" id="exportMonthBtn" style="display:flex;align-items:center;justify-content:center;gap:6px;flex:1 1 auto;"><i class="ti ti-file-spreadsheet"></i>This month</button>
         <button class="btn" id="exportAllBtn" style="display:flex;align-items:center;justify-content:center;gap:6px;flex:1 1 auto;"><i class="ti ti-download"></i>All data (full workbook)</button>
       </div>
+      <button class="btn" id="importBtn" style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;border-color:var(--gold);color:var(--gold);"><i class="ti ti-upload"></i>Import bank statement (Excel/CSV)</button>
+      <input type="file" id="importFileInput" accept=".xlsx,.xls,.csv" style="display:none;">
     </div>
     <div class="section">
       <div id="allTxnList"></div>
@@ -431,13 +434,14 @@
 
 <div class="sheet-backdrop" id="addBackdrop">
   <div class="sheet">
-    <h3>Add transaction</h3>
+    <h3 id="sheetTitle">Add transaction</h3>
     <div class="type-toggle" id="typeToggle">
       <button class="type-btn expense sel" data-t="expense"><i class="ti ti-arrow-up-right"></i>Expense</button>
       <button class="type-btn income" data-t="income"><i class="ti ti-arrow-down-left"></i>Income</button>
       <button class="type-btn invest" data-t="investment"><i class="ti ti-chart-line"></i>Invest</button>
     </div>
     <div class="field"><label>Amount</label><input type="number" id="inAmount" placeholder="0" inputmode="decimal"></div>
+    <div class="field"><label>Date</label><input type="date" id="inDate"></div>
     <div class="field"><label>Note</label><input type="text" id="inNote" placeholder="What was this for?"></div>
     <div class="field">
       <label>Category</label>
@@ -445,8 +449,54 @@
       <div class="sub-chips" id="subChips"></div>
     </div>
     <div class="sheet-actions">
+      <button class="btn danger" id="deleteInSheet" style="display:none;flex:none;padding:12px 16px;"><i class="ti ti-trash"></i></button>
       <button class="btn" id="cancelAdd">Cancel</button>
       <button class="btn primary" id="confirmAdd">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="sheet-backdrop" id="importBackdrop">
+  <div class="sheet">
+    <h3>Match your columns</h3>
+    <p style="font-size:12.5px;color:var(--paper-dimmer);margin:-10px 0 16px;">Tell us which column in your file is which. We'll skip anything that looks like a duplicate of what's already in your ledger.</p>
+
+    <div class="field"><label>Date column</label><select id="mapDate"></select></div>
+    <div class="field"><label>Description column</label><select id="mapDesc"></select></div>
+    <div class="field"><label>Main category column</label><select id="mapCat"></select></div>
+    <div class="field"><label>Sub-category column (optional)</label><select id="mapSub"></select></div>
+    <div class="field"><label>Amount column</label><select id="mapAmount"></select></div>
+
+    <div class="field">
+      <label>Transaction type</label>
+      <select id="mapTypeMode">
+        <option value="infer">Infer from amount sign (negative = expense, positive = income)</option>
+        <option value="column">Use a column for type</option>
+        <option value="fixed_expense">Treat every row as Expense</option>
+        <option value="fixed_income">Treat every row as Income</option>
+        <option value="fixed_investment">Treat every row as Investment</option>
+      </select>
+    </div>
+    <div class="field" id="mapTypeColWrap" style="display:none;"><label>Type column</label><select id="mapTypeCol"></select></div>
+
+    <div id="importPreviewWrap" style="margin-top:6px;">
+      <div style="font-size:11px;color:var(--paper-dimmer);font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Preview (first 3 rows)</div>
+      <div id="importPreview" style="font-size:12px;color:var(--paper-dim);background:var(--surface-2);border-radius:10px;padding:10px;font-family:'IBM Plex Mono',monospace;overflow-x:auto;white-space:pre;"></div>
+    </div>
+
+    <div class="sheet-actions">
+      <button class="btn" id="cancelImport">Cancel</button>
+      <button class="btn primary" id="confirmImport">Import</button>
+    </div>
+  </div>
+</div>
+
+<div class="sheet-backdrop" id="importResultBackdrop">
+  <div class="sheet">
+    <h3><i class="ti ti-circle-check" style="color:var(--sage);"></i> Import complete</h3>
+    <div id="importResultBody" style="font-size:14px;line-height:1.7;color:var(--paper-dim);"></div>
+    <div class="sheet-actions">
+      <button class="btn primary" id="closeImportResult" style="width:100%;">Done</button>
     </div>
   </div>
 </div>
@@ -729,7 +779,7 @@ function subInfo(type, catId, subId){ const c = catInfo(type,catId); return (c.s
 const PIE_COLORS = ['#E2794A','#7FC49A','#5FB4C9','#D8B048','#B08AD9','#E0708A','#8AAD7F','#C97A3E','#4FA0B0','#D6A94A'];
 
 function render(){
-  document.getElementById('monthLabel').textContent = monthLabelStr(currentMonth);
+  document.getElementById('monthLabelText').textContent = monthLabelStr(currentMonth);
   const monthTxns = txnsForMonth();
   const sum = type => monthTxns.filter(t=>t.type===type).reduce((s,t)=>s+t.amount,0);
   const income = sum('income'), expense = sum('expense'), invest = sum('investment');
@@ -857,11 +907,17 @@ function txnRowHtml(t){
   const d = new Date(t.date);
   const dateStr = d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
   const sign = t.type==='income' ? '+' : '−';
-  return `<div class="txn"><div class="txn-icon ${TYPE_META[t.type].color}"><i class="ti ${c.icon}"></i></div><div class="txn-mid"><div class="txn-title">${t.note || (s?s.label:c.label)}</div><div class="txn-meta">${c.label}${s?' · '+s.label:''} · ${dateStr}</div></div><div class="txn-amt ${TYPE_META[t.type].color}">${sign}${fmt(t.amount)}</div><button class="txn-del" data-id="${t.id}" aria-label="Delete"><i class="ti ti-trash"></i></button></div>`;
+  return `<div class="txn"><div class="txn-icon ${TYPE_META[t.type].color}"><i class="ti ${c.icon}"></i></div><div class="txn-mid txn-edit" data-id="${t.id}" style="cursor:pointer;"><div class="txn-title">${t.note || (s?s.label:c.label)}</div><div class="txn-meta">${c.label}${s?' · '+s.label:''} · ${dateStr}</div></div><div class="txn-amt ${TYPE_META[t.type].color}">${sign}${fmt(t.amount)}</div><button class="txn-del" data-id="${t.id}" aria-label="Delete"><i class="ti ti-trash"></i></button></div>`;
 }
 function attachTxnDeleteHandlers(){
   document.querySelectorAll('.txn-del').forEach(btn=>{
-    btn.onclick = async ()=>{ state.txns = state.txns.filter(t=>t.id!==btn.getAttribute('data-id')); await saveTxns(); render(); };
+    btn.onclick = async (e)=>{ e.stopPropagation(); state.txns = state.txns.filter(t=>t.id!==btn.getAttribute('data-id')); await saveTxns(); render(); };
+  });
+  document.querySelectorAll('.txn-edit').forEach(el=>{
+    el.onclick = ()=>{
+      const t = state.txns.find(x=>x.id===el.getAttribute('data-id'));
+      if(t) openEditSheet(t);
+    };
   });
 }
 
@@ -994,8 +1050,20 @@ document.querySelectorAll('.navbtn').forEach(btn=>{
 });
 document.getElementById('prevMonth').onclick = ()=>{ currentMonth.setMonth(currentMonth.getMonth()-1); render(); };
 document.getElementById('nextMonth').onclick = ()=>{ currentMonth.setMonth(currentMonth.getMonth()+1); render(); };
+document.getElementById('monthLabel').onclick = ()=>{
+  const mp = document.getElementById('monthPicker');
+  mp.value = monthKey(currentMonth);
+  if(mp.showPicker){ try{ mp.showPicker(); return; }catch(e){} }
+  mp.click();
+};
+document.getElementById('monthPicker').addEventListener('change', (e)=>{
+  const [y,m] = e.target.value.split('-').map(Number);
+  if(y && m){ currentMonth = new Date(y, m-1, 1); render(); }
+});
 
 const addBackdrop = document.getElementById('addBackdrop');
+let editingTxnId = null;
+
 function renderCatGrid(){
   const grid = document.getElementById('catGrid');
   const cats = catsFor(addType);
@@ -1024,23 +1092,57 @@ document.getElementById('typeToggle').addEventListener('click',(e)=>{
   btn.classList.add('sel');
   renderCatGrid();
 });
-document.getElementById('fabAdd').onclick = ()=>{
+function todayStr(){
+  const now = new Date();
+  return now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+}
+function openAddSheet(){
+  editingTxnId = null;
+  document.getElementById('sheetTitle').textContent = 'Add transaction';
+  document.getElementById('deleteInSheet').style.display = 'none';
   document.getElementById('inAmount').value=''; document.getElementById('inNote').value='';
+  document.getElementById('inDate').value = todayStr();
   addType='expense'; selectedCat=null; selectedSub=null;
   document.querySelectorAll('#typeToggle .type-btn').forEach(b=>b.classList.remove('sel'));
   document.querySelector('#typeToggle .type-btn[data-t="expense"]').classList.add('sel');
   renderCatGrid();
   addBackdrop.classList.add('open');
-};
+}
+function openEditSheet(txn){
+  editingTxnId = txn.id;
+  document.getElementById('sheetTitle').textContent = 'Edit transaction';
+  document.getElementById('deleteInSheet').style.display = 'flex';
+  document.getElementById('inAmount').value = txn.amount;
+  document.getElementById('inNote').value = txn.note || '';
+  document.getElementById('inDate').value = txn.date;
+  addType = txn.type; selectedCat = txn.catId; selectedSub = txn.subId || null;
+  document.querySelectorAll('#typeToggle .type-btn').forEach(b=>b.classList.remove('sel'));
+  document.querySelector(`#typeToggle .type-btn[data-t="${addType}"]`).classList.add('sel');
+  renderCatGrid();
+  addBackdrop.classList.add('open');
+}
+document.getElementById('fabAdd').onclick = openAddSheet;
 document.getElementById('cancelAdd').onclick = ()=> addBackdrop.classList.remove('open');
 addBackdrop.onclick = (e)=>{ if(e.target===addBackdrop) addBackdrop.classList.remove('open'); };
 document.getElementById('confirmAdd').onclick = async ()=>{
   const amount = parseFloat(document.getElementById('inAmount').value);
-  if(!amount || amount<=0 || !selectedCat) return;
+  const dateVal = document.getElementById('inDate').value;
+  if(!amount || amount<=0 || !selectedCat || !dateVal) return;
   const note = document.getElementById('inNote').value.trim();
-  const now = new Date();
-  const dateStr = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
-  state.txns.push({id: Date.now().toString(36)+Math.random().toString(36).slice(2,6), type:addType, catId:selectedCat, subId:selectedSub, amount, note, date:dateStr});
+  if(editingTxnId){
+    const t = state.txns.find(x=>x.id===editingTxnId);
+    if(t){ t.type=addType; t.catId=selectedCat; t.subId=selectedSub; t.amount=amount; t.note=note; t.date=dateVal; }
+  } else {
+    state.txns.push({id: Date.now().toString(36)+Math.random().toString(36).slice(2,6), type:addType, catId:selectedCat, subId:selectedSub, amount, note, date:dateVal});
+  }
+  await saveTxns();
+  addBackdrop.classList.remove('open');
+  render();
+};
+document.getElementById('deleteInSheet').onclick = async ()=>{
+  if(!editingTxnId) return;
+  if(!confirm('Delete this transaction?')) return;
+  state.txns = state.txns.filter(t=>t.id!==editingTxnId);
   await saveTxns();
   addBackdrop.classList.remove('open');
   render();
@@ -1113,6 +1215,196 @@ document.getElementById('exportAllBtn').onclick = ()=>{
     {name:'Monthly by Sub-category', rows: monthlySubcategorySummaryRows()}
   ], `ledger-full-export-${stamp}.xlsx`);
 };
+
+/* ================= Import bank statement ================= */
+let importRows = [];
+let importHeaders = [];
+const importBackdrop = document.getElementById('importBackdrop');
+const importResultBackdrop = document.getElementById('importResultBackdrop');
+
+document.getElementById('importBtn').onclick = ()=> document.getElementById('importFileInput').click();
+
+document.getElementById('importFileInput').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, {type:'array', cellDates:true});
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const json = XLSX.utils.sheet_to_json(sheet, {defval:''});
+  if(json.length===0){ alert('No rows found in that file.'); e.target.value=''; return; }
+  importRows = json;
+  importHeaders = Object.keys(json[0]);
+  setupImportMapping();
+  importBackdrop.classList.add('open');
+  e.target.value = '';
+});
+
+function guessColumn(candidates){
+  const lower = importHeaders.map(h=>({h, l:h.toLowerCase().trim()}));
+  for(const cand of candidates){
+    const hit = lower.find(x=>x.l===cand);
+    if(hit) return hit.h;
+  }
+  for(const cand of candidates){
+    const hit = lower.find(x=>x.l.includes(cand));
+    if(hit) return hit.h;
+  }
+  return '';
+}
+function fillSelect(sel, includeNone){
+  sel.innerHTML = (includeNone ? `<option value="">— none —</option>` : '') + importHeaders.map(h=>`<option value="${h}">${h}</option>`).join('');
+}
+function setupImportMapping(){
+  const selDate = document.getElementById('mapDate');
+  const selDesc = document.getElementById('mapDesc');
+  const selCat = document.getElementById('mapCat');
+  const selSub = document.getElementById('mapSub');
+  const selAmt = document.getElementById('mapAmount');
+  const selTypeCol = document.getElementById('mapTypeCol');
+  [selDate, selDesc, selCat, selAmt, selTypeCol].forEach(s=>fillSelect(s, false));
+  fillSelect(selSub, true);
+
+  selDate.value = guessColumn(['date','txn date','transaction date','value date']) || importHeaders[0];
+  selDesc.value = guessColumn(['description','narration','details','particulars','remarks','note']) || importHeaders[0];
+  selCat.value = guessColumn(['category','main category','head']) || importHeaders[0];
+  selSub.value = guessColumn(['sub category','sub-category','subcategory']) || '';
+  selAmt.value = guessColumn(['amount','amt','value','debit/credit','txn amount']) || importHeaders[0];
+  selTypeCol.value = guessColumn(['type','debit/credit','dr/cr','transaction type']) || importHeaders[0];
+
+  document.getElementById('mapTypeMode').value = 'infer';
+  document.getElementById('mapTypeColWrap').style.display = 'none';
+
+  renderImportPreview();
+  [selDate, selDesc, selCat, selSub, selAmt, selTypeCol].forEach(s=> s.onchange = renderImportPreview);
+}
+document.getElementById('mapTypeMode').addEventListener('change', (e)=>{
+  document.getElementById('mapTypeColWrap').style.display = e.target.value==='column' ? 'block' : 'none';
+  renderImportPreview();
+});
+
+function parseDateVal(v){
+  if(v instanceof Date) return v.getFullYear()+'-'+String(v.getMonth()+1).padStart(2,'0')+'-'+String(v.getDate()).padStart(2,'0');
+  const s = String(v).trim();
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if(m){
+    let [_, a, b, y] = m;
+    if(y.length===2) y = '20'+y;
+    // assume DD/MM/YYYY (common on bank statements outside the US)
+    return `${y}-${b.padStart(2,'0')}-${a.padStart(2,'0')}`;
+  }
+  const d = new Date(s);
+  if(!isNaN(d)) return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  return null;
+}
+function resolveRow(row){
+  const dateCol = document.getElementById('mapDate').value;
+  const descCol = document.getElementById('mapDesc').value;
+  const catCol = document.getElementById('mapCat').value;
+  const subCol = document.getElementById('mapSub').value;
+  const amtCol = document.getElementById('mapAmount').value;
+  const typeMode = document.getElementById('mapTypeMode').value;
+  const typeCol = document.getElementById('mapTypeCol').value;
+
+  const date = parseDateVal(row[dateCol]);
+  const note = String(row[descCol] ?? '').trim();
+  const catLabel = String(row[catCol] ?? '').trim() || 'Other';
+  const subLabel = subCol ? String(row[subCol] ?? '').trim() : '';
+  let rawAmt = row[amtCol];
+  if(typeof rawAmt === 'string') rawAmt = parseFloat(rawAmt.replace(/[^0-9.\-]/g,''));
+  const amt = Number(rawAmt) || 0;
+
+  let type;
+  if(typeMode==='fixed_expense') type='expense';
+  else if(typeMode==='fixed_income') type='income';
+  else if(typeMode==='fixed_investment') type='investment';
+  else if(typeMode==='column'){
+    const raw = String(row[typeCol] ?? '').toLowerCase();
+    if(raw.includes('cr') || raw.includes('income') || raw.includes('deposit')) type='income';
+    else if(raw.includes('invest')) type='investment';
+    else type='expense';
+  } else {
+    type = amt < 0 ? 'expense' : 'income';
+  }
+  const amount = Math.abs(amt);
+  return {date, note, catLabel, subLabel, type, amount};
+}
+function renderImportPreview(){
+  const rows = importRows.slice(0,3).map(resolveRow);
+  const lines = rows.map(r=> `${r.date || '??'}  ${r.type.padEnd(10)}  ${(r.catLabel||'').padEnd(14)}  ${fmt(r.amount).padEnd(10)}  ${r.note.slice(0,28)}`);
+  document.getElementById('importPreview').textContent = lines.join('\n') || 'Adjust the mapping above to see a preview.';
+}
+document.getElementById('cancelImport').onclick = ()=> importBackdrop.classList.remove('open');
+importBackdrop.onclick = (e)=>{ if(e.target===importBackdrop) importBackdrop.classList.remove('open'); };
+
+function normKey(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim(); }
+function findOrCreateCategory(type, label){
+  if(!label) label = 'Other';
+  const existing = catsFor(type).find(c=> c.label.toLowerCase()===label.toLowerCase());
+  if(existing) return existing;
+  const id = slug(label)+'_'+Date.now().toString(36).slice(-4)+Math.random().toString(36).slice(2,4);
+  const cat = {id, label, icon:'ti-dots', subs:[]};
+  state.categories[type].push(cat);
+  return cat;
+}
+function findOrCreateSub(type, cat, subLabel){
+  if(!subLabel) return null;
+  cat.subs = cat.subs || [];
+  const existing = cat.subs.find(s=> s.label.toLowerCase()===subLabel.toLowerCase());
+  if(existing) return existing;
+  const sub = {id: slug(subLabel)+'_'+Date.now().toString(36).slice(-4)+Math.random().toString(36).slice(2,4), label:subLabel};
+  cat.subs.push(sub);
+  return sub;
+}
+function existingDedupeKeys(){
+  const set = new Set();
+  state.txns.forEach(t=> set.add(`${t.date}|${Math.round(t.amount)}|${t.type}|${normKey(t.note)}`));
+  return set;
+}
+
+document.getElementById('confirmImport').onclick = async ()=>{
+  const dedupe = existingDedupeKeys();
+  let imported = 0, skipped = 0, invalid = 0, newCats = 0, newSubs = 0;
+
+  for(const row of importRows){
+    const r = resolveRow(row);
+    if(!r.date || !r.amount){ invalid++; continue; }
+    const key = `${r.date}|${Math.round(r.amount)}|${r.type}|${normKey(r.note)}`;
+    if(dedupe.has(key)){ skipped++; continue; }
+
+    const hadCat = catsFor(r.type).find(c=>c.label.toLowerCase()===r.catLabel.toLowerCase());
+    const cat = findOrCreateCategory(r.type, r.catLabel);
+    if(!hadCat) newCats++;
+    let sub = null;
+    if(r.subLabel){
+      const hadSub = (cat.subs||[]).find(s=>s.label.toLowerCase()===r.subLabel.toLowerCase());
+      sub = findOrCreateSub(r.type, cat, r.subLabel);
+      if(!hadSub) newSubs++;
+    }
+    state.txns.push({
+      id: Date.now().toString(36)+Math.random().toString(36).slice(2,8),
+      type: r.type, catId: cat.id, subId: sub ? sub.id : null,
+      amount: r.amount, note: r.note, date: r.date, source:'import'
+    });
+    dedupe.add(key);
+    imported++;
+  }
+
+  await saveTxns();
+  await saveCategories();
+  importBackdrop.classList.remove('open');
+  render();
+
+  document.getElementById('importResultBody').innerHTML = `
+    <div style="margin-bottom:6px;"><b style="color:var(--sage);">${imported}</b> transaction${imported===1?'':'s'} imported</div>
+    <div style="margin-bottom:6px;"><b style="color:var(--paper);">${skipped}</b> duplicate${skipped===1?'':'s'} skipped (already in your ledger)</div>
+    ${invalid ? `<div style="margin-bottom:6px;"><b style="color:var(--gold);">${invalid}</b> row${invalid===1?'':'s'} skipped (missing date or amount)</div>` : ''}
+    ${(newCats||newSubs) ? `<div style="margin-top:10px;font-size:12.5px;color:var(--paper-dimmer);">Created ${newCats} new categor${newCats===1?'y':'ies'}${newSubs?` and ${newSubs} sub-categor${newSubs===1?'y':'ies'}`:''} from your file.</div>` : ''}
+  `;
+  importResultBackdrop.classList.add('open');
+};
+document.getElementById('closeImportResult').onclick = ()=> importResultBackdrop.classList.remove('open');
 </script>
 </body>
 </html>
