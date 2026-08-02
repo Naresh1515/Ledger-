@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" id="htmlRoot">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -10,8 +10,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.44.0/iconfont/tabler-icons.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root{
     --ink:#0B0F0D; --ink-2:#0F1512; --surface:#161F1B; --surface-2:#1D2822; --surface-3:#233029;
@@ -21,14 +22,32 @@
     --invest:#5FB4C9; --invest-dim:#2A4F57;
     --gold:#D8B048; --rust:#D9723A; --sage:#8AAD7F;
     --line:#26312B; --line-soft:#1D2621;
+    --fs-h1:24px; --fs-hero:38px; --fs-stat:18px; --fs-section:16px; --fs-body:14px; --fs-small:11px;
   }
+  html.theme-ocean{
+    --ink:#070C12; --surface:#111C26; --surface-2:#17232F; --surface-3:#1E2C3A;
+    --paper:#E8EEF3; --paper-dim:#8FA3B5; --paper-dimmer:#5E7387;
+    --income:#6FD6A8; --expense:#F08A5D; --invest:#5FA8E6;
+    --gold:#E0B84B; --sage:#6FD6A8; --rust:#E0703E;
+    --line:#1E2C3A; --line-soft:#182430;
+  }
+  html.theme-sunrise{
+    --ink:#FAF6EC; --surface:#FFFFFF; --surface-2:#F3EEDF; --surface-3:#EAE2CB;
+    --paper:#2B2620; --paper-dim:#6B6255; --paper-dimmer:#948B7C;
+    --income:#4C8F63; --expense:#C85A2C; --invest:#2E7F91;
+    --gold:#B8862F; --sage:#4C8F63; --rust:#C85A2C;
+    --line:#DDD4BC; --line-soft:#E8E0C9;
+  }
+  html.text-large{ --fs-h1:28px; --fs-hero:46px; --fs-stat:21px; --fs-section:18px; --fs-body:15.5px; --fs-small:12px; }
+
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   body{margin:0;background:var(--ink);color:var(--paper);font-family:'Inter',sans-serif;overscroll-behavior:none;}
-  .app{max-width:420px;margin:0 auto;min-height:100vh;background:radial-gradient(120% 60% at 50% 0%, #131A16 0%, var(--ink) 60%);position:relative;padding-bottom:86px;}
+  .app{max-width:420px;margin:0 auto;min-height:100vh;background:var(--ink);position:relative;padding-bottom:86px;}
+  html:not(.theme-sunrise) .app{background:radial-gradient(120% 60% at 50% 0%, color-mix(in srgb, var(--surface) 55%, var(--ink)) 0%, var(--ink) 60%);}
 
   .lock{position:fixed;inset:0;background:var(--ink);z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;}
   .lock-icon{width:56px;height:56px;border-radius:14px;background:var(--surface);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:26px;color:var(--gold);margin-bottom:18px;}
-  .lock h2{font-family:'Fraunces',serif;font-weight:500;font-size:19px;margin:0 0 4px;}
+  .lock h2{font-family:'Fraunces',serif;font-weight:600;font-size:19px;margin:0 0 4px;color:var(--paper);}
   .lock p{color:var(--paper-dim);font-size:13px;margin:0 0 26px;text-align:center;max-width:260px;}
   .dots{display:flex;gap:14px;margin-bottom:30px;}
   .dot{width:14px;height:14px;border-radius:50%;border:1px solid var(--line);background:var(--surface);transition:background .15s;}
@@ -43,17 +62,41 @@
   .header{padding:26px 20px 14px;}
   .header-top{display:flex;justify-content:space-between;align-items:flex-start;}
   .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--paper-dimmer);}
-  .header h1{font-family:'Fraunces',serif;font-weight:600;font-size:24px;margin:3px 0 0;}
+  .header h1{font-family:'Fraunces',serif;font-weight:700;font-size:var(--fs-h1);margin:3px 0 0;}
   .header-icons{display:flex;gap:8px;align-items:center;}
   .icon-btn{background:var(--surface);border:1px solid var(--line);color:var(--paper-dim);width:32px;height:32px;border-radius:9px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
   .month-nav{display:flex;align-items:center;gap:8px;margin-top:16px;}
   .month-nav button{background:var(--surface);border:1px solid var(--line);color:var(--paper-dim);width:28px;height:28px;border-radius:8px;font-size:14px;cursor:pointer;}
   .month-nav span{font-family:'IBM Plex Mono',monospace;font-size:12px;flex:1;text-align:center;color:var(--paper-dim);}
 
-  .net-hero{margin:6px 20px 0;padding:20px;border-radius:18px;background:linear-gradient(160deg,#17211C 0%,#141B17 100%);border:1px solid var(--line);position:relative;overflow:hidden;}
-  .net-hero::after{content:'';position:absolute;top:-40%;right:-20%;width:180px;height:180px;background:radial-gradient(circle,rgba(216,176,72,0.10) 0%,transparent 70%);}
+  .segwrap{padding:16px 20px 0;}
+  .seg{display:flex;background:var(--surface);border-radius:12px;padding:3px;border:1px solid var(--line-soft);}
+  .seg button{flex:1;border:none;background:none;color:var(--paper-dimmer);font-size:12px;font-family:'IBM Plex Mono',monospace;padding:9px 4px;border-radius:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;}
+  .seg button.active{background:var(--surface-3);color:var(--paper);}
+  .seg button.active.income{color:var(--income);}
+  .seg button.active.expense{color:var(--expense);}
+  .seg button.active.invest{color:var(--invest);}
+
+  /* ===== Pie chart ===== */
+  .pie-card{margin:16px 20px 0;padding:18px;border-radius:18px;background:var(--surface);border:1px solid var(--line-soft);}
+  .pie-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px;}
+  .pie-title{font-family:'Fraunces',serif;font-weight:700;font-size:var(--fs-section);}
+  .pie-sub{font-size:10.5px;color:var(--paper-dimmer);font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;}
+  .pie-body{display:flex;align-items:center;gap:16px;}
+  .pie-donut{width:118px;height:118px;border-radius:50%;flex-shrink:0;position:relative;}
+  .pie-donut-hole{position:absolute;inset:16px;border-radius:50%;background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;}
+  .pie-donut-hole .t{font-family:'Fraunces',serif;font-weight:700;font-size:15px;}
+  .pie-donut-hole .l{font-size:8.5px;color:var(--paper-dimmer);font-family:'IBM Plex Mono',monospace;text-transform:uppercase;}
+  .pie-legend{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0;}
+  .pie-legend-row{display:flex;align-items:center;gap:8px;font-size:12px;}
+  .pie-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+  .pie-legend-label{flex:1;color:var(--paper-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .pie-legend-val{font-family:'IBM Plex Mono',monospace;color:var(--paper);font-weight:500;}
+
+  .net-hero{margin:16px 20px 0;padding:20px;border-radius:18px;background:linear-gradient(160deg,var(--surface-2) 0%,var(--surface) 100%);border:1px solid var(--line);position:relative;overflow:hidden;}
+  .net-hero::after{content:'';position:absolute;top:-40%;right:-20%;width:180px;height:180px;background:radial-gradient(circle,color-mix(in srgb, var(--gold) 12%, transparent) 0%,transparent 70%);}
   .net-label{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--paper-dimmer);text-transform:uppercase;letter-spacing:0.1em;}
-  .net-amount{font-family:'Fraunces',serif;font-weight:600;font-size:38px;margin:6px 0 2px;font-variant-numeric:tabular-nums;position:relative;}
+  .net-amount{font-family:'Fraunces',serif;font-weight:800;font-size:var(--fs-hero);line-height:1.1;margin:6px 0 2px;font-variant-numeric:tabular-nums;position:relative;}
   .net-amount.neg{color:var(--expense);}
   .net-sub{font-size:12px;color:var(--paper-dimmer);position:relative;}
 
@@ -67,28 +110,21 @@
   .stat-card.income .slabel i{color:var(--income);}
   .stat-card.expense .slabel i{color:var(--expense);}
   .stat-card.invest .slabel i{color:var(--invest);}
-  .stat-card .sval{font-family:'Fraunces',serif;font-size:18px;margin-top:5px;font-variant-numeric:tabular-nums;}
-
-  .segwrap{padding:20px 20px 0;}
-  .seg{display:flex;background:var(--surface);border-radius:12px;padding:3px;border:1px solid var(--line-soft);}
-  .seg button{flex:1;border:none;background:none;color:var(--paper-dimmer);font-size:12px;font-family:'IBM Plex Mono',monospace;padding:9px 4px;border-radius:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;}
-  .seg button.active{background:var(--surface-3);color:var(--paper);}
-  .seg button.active.income{color:var(--income);}
-  .seg button.active.expense{color:var(--expense);}
-  .seg button.active.invest{color:var(--invest);}
+  .stat-card .sval{font-family:'Fraunces',serif;font-weight:700;font-size:var(--fs-stat);margin-top:5px;font-variant-numeric:tabular-nums;}
 
   .section{padding:22px 20px 4px;}
   .section-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;}
-  .section-title{font-family:'Fraunces',serif;font-size:16px;font-weight:600;}
+  .section-title{font-family:'Fraunces',serif;font-size:var(--fs-section);font-weight:700;}
+  .section-tag{font-size:9.5px;font-family:'IBM Plex Mono',monospace;color:var(--paper-dimmer);text-transform:uppercase;letter-spacing:0.06em;}
   .section-link{font-size:11.5px;color:var(--sage);font-family:'IBM Plex Mono',monospace;background:none;border:none;cursor:pointer;}
 
   .ledger-row{margin-bottom:15px;}
   .ledger-top{display:flex;align-items:baseline;font-family:'IBM Plex Mono',monospace;font-size:12.5px;margin-bottom:6px;}
-  .ledger-name{display:flex;align-items:center;gap:7px;color:var(--paper);}
+  .ledger-name{display:flex;align-items:center;gap:7px;color:var(--paper);font-weight:500;}
   .ledger-name i{font-size:14px;color:var(--paper-dim);}
   .ledger-dots{flex:1;border-bottom:1px dotted var(--line);margin:0 8px 3px;}
   .ledger-amt{color:var(--paper-dimmer);white-space:nowrap;}
-  .ledger-amt b{color:var(--paper);font-weight:500;}
+  .ledger-amt b{color:var(--paper);font-weight:600;}
   .ledger-track{height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden;}
   .ledger-fill{height:100%;border-radius:3px;}
   .ledger-fill.income{background:var(--income);}
@@ -98,12 +134,20 @@
   .ledger-fill.over{background:var(--rust);}
   .ledger-subs{padding-left:20px;margin-top:6px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--paper-dimmer);display:flex;flex-wrap:wrap;gap:6px 12px;}
 
+  .subcat-table{background:var(--surface);border:1px solid var(--line-soft);border-radius:14px;overflow:hidden;}
+  .subcat-row{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-bottom:1px solid var(--line-soft);font-size:13px;}
+  .subcat-row:last-child{border-bottom:none;}
+  .subcat-left{display:flex;flex-direction:column;gap:1px;min-width:0;}
+  .subcat-name{color:var(--paper);}
+  .subcat-parent{font-size:10.5px;color:var(--paper-dimmer);font-family:'IBM Plex Mono',monospace;}
+  .subcat-amt{font-family:'IBM Plex Mono',monospace;font-weight:600;white-space:nowrap;padding-left:10px;}
+
   .alert{display:flex;gap:10px;align-items:flex-start;background:var(--surface);border:1px solid var(--expense-dim);border-left:3px solid var(--expense);border-radius:0 10px 10px 0;padding:11px 13px;margin-bottom:10px;}
   .alert.watch{border-left-color:var(--gold);border-color:#5C4A1B;}
   .alert i{color:var(--expense);font-size:17px;margin-top:1px;}
   .alert.watch i{color:var(--gold);}
   .alert-text{font-size:13px;line-height:1.4;}
-  .alert-text b{font-weight:600;}
+  .alert-text b{font-weight:700;}
   .alert-sub{font-size:11px;color:var(--paper-dimmer);margin-top:2px;font-family:'IBM Plex Mono',monospace;}
   .empty-alert{font-size:13px;color:var(--paper-dimmer);font-style:italic;padding:6px 2px 16px;}
 
@@ -114,9 +158,9 @@
   .txn-icon.expense{color:var(--expense);}
   .txn-icon.invest{color:var(--invest);}
   .txn-mid{flex:1;min-width:0;}
-  .txn-title{font-size:14px;color:var(--paper);}
+  .txn-title{font-size:var(--fs-body);color:var(--paper);}
   .txn-meta{font-size:11px;color:var(--paper-dimmer);font-family:'IBM Plex Mono',monospace;margin-top:1px;}
-  .txn-amt{font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:500;white-space:nowrap;}
+  .txn-amt{font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600;white-space:nowrap;}
   .txn-amt.income{color:var(--income);}
   .txn-amt.expense{color:var(--expense);}
   .txn-amt.invest{color:var(--invest);}
@@ -140,7 +184,7 @@
   .sheet-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:flex-end;justify-content:center;z-index:30;}
   .sheet-backdrop.open{display:flex;}
   .sheet{width:100%;max-width:420px;background:var(--surface);border-radius:20px 20px 0 0;padding:20px 20px 26px;border-top:1px solid var(--line);max-height:88vh;overflow-y:auto;}
-  .sheet h3{font-family:'Fraunces',serif;font-weight:600;font-size:18px;margin:0 0 16px;}
+  .sheet h3{font-family:'Fraunces',serif;font-weight:700;font-size:18px;margin:0 0 16px;}
   .field{margin-bottom:14px;}
   .field label{display:block;font-size:11px;color:var(--paper-dimmer);font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;}
   .field input, .field select{width:100%;background:var(--surface-2);border:1px solid var(--line);color:var(--paper);border-radius:9px;padding:10px 12px;font-size:15px;font-family:'Inter',sans-serif;}
@@ -149,20 +193,20 @@
   .type-toggle{display:flex;gap:8px;margin-bottom:16px;}
   .type-btn{flex:1;padding:10px 4px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);color:var(--paper-dimmer);font-size:12px;font-family:'IBM Plex Mono',monospace;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;}
   .type-btn i{font-size:17px;}
-  .type-btn.sel.income{border-color:var(--income);color:var(--income);background:rgba(127,196,154,0.08);}
-  .type-btn.sel.expense{border-color:var(--expense);color:var(--expense);background:rgba(226,121,74,0.08);}
-  .type-btn.sel.invest{border-color:var(--invest);color:var(--invest);background:rgba(95,180,201,0.08);}
+  .type-btn.sel.income{border-color:var(--income);color:var(--income);background:color-mix(in srgb, var(--income) 10%, transparent);}
+  .type-btn.sel.expense{border-color:var(--expense);color:var(--expense);background:color-mix(in srgb, var(--expense) 10%, transparent);}
+  .type-btn.sel.invest{border-color:var(--invest);color:var(--invest);background:color-mix(in srgb, var(--invest) 10%, transparent);}
 
   .cat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
   .cat-pick{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 4px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;color:var(--paper-dimmer);font-size:9.5px;text-align:center;}
   .cat-pick i{font-size:16px;}
-  .cat-pick.sel{border-color:var(--sage);color:var(--sage);background:rgba(138,173,127,0.1);}
+  .cat-pick.sel{border-color:var(--sage);color:var(--sage);background:color-mix(in srgb, var(--sage) 10%, transparent);}
   .sub-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
   .sub-chip{font-size:12px;padding:7px 12px;border-radius:20px;border:1px solid var(--line);background:var(--surface-2);color:var(--paper-dimmer);cursor:pointer;}
-  .sub-chip.sel{border-color:var(--sage);color:var(--sage);background:rgba(138,173,127,0.1);}
+  .sub-chip.sel{border-color:var(--sage);color:var(--sage);background:color-mix(in srgb, var(--sage) 10%, transparent);}
   .sheet-actions{display:flex;gap:10px;margin-top:18px;}
-  .btn{flex:1;padding:12px;border-radius:10px;border:1px solid var(--line);background:none;color:var(--paper-dim);font-family:'Inter',sans-serif;font-size:14px;font-weight:500;cursor:pointer;}
-  .btn.primary{background:var(--sage);border-color:var(--sage);color:#0F1512;}
+  .btn{flex:1;padding:12px;border-radius:10px;border:1px solid var(--line);background:none;color:var(--paper-dim);font-family:'Inter',sans-serif;font-size:14px;font-weight:600;cursor:pointer;}
+  .btn.primary{background:var(--sage);border-color:var(--sage);color:var(--ink);}
   .btn.danger{border-color:var(--expense-dim);color:var(--expense);}
 
   .budget-edit{background:var(--surface);border:1px solid var(--line-soft);border-radius:12px;padding:14px;margin-bottom:12px;}
@@ -173,8 +217,8 @@
   .security-row div span{display:block;font-size:14px;}
   .security-row div small{color:var(--paper-dimmer);font-size:11px;font-family:'IBM Plex Mono',monospace;}
 
-  .setup-tabs{display:flex;gap:8px;margin-bottom:16px;}
-  .setup-tab{flex:1;padding:9px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--paper-dimmer);font-size:12px;font-family:'IBM Plex Mono',monospace;cursor:pointer;}
+  .setup-tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+  .setup-tab{flex:1;min-width:90px;padding:9px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--paper-dimmer);font-size:12px;font-family:'IBM Plex Mono',monospace;cursor:pointer;}
   .setup-tab.active{background:var(--surface-3);color:var(--paper);}
   .setup-pane{display:none;}
   .setup-pane.active{display:block;}
@@ -182,7 +226,6 @@
   .cat-manage-top{display:flex;align-items:center;justify-content:space-between;}
   .cat-manage-top .left{display:flex;align-items:center;gap:9px;font-size:14px;}
   .cat-manage-top .left i{font-size:17px;color:var(--paper-dim);}
-  .cat-manage-actions{display:flex;gap:6px;}
   .mini-btn{background:none;border:none;color:var(--paper-dimmer);font-size:15px;cursor:pointer;padding:4px 6px;}
   .cat-manage-subs{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);}
   .sub-tag{font-size:11px;font-family:'IBM Plex Mono',monospace;background:var(--surface-2);border:1px solid var(--line);padding:5px 9px;border-radius:14px;color:var(--paper-dim);display:flex;align-items:center;gap:6px;}
@@ -193,7 +236,17 @@
   .add-cat-card{background:var(--surface);border:1px dashed var(--line);border-radius:12px;padding:14px;margin-bottom:10px;}
   .icon-picker{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;margin-top:8px;}
   .icon-pick{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;height:34px;display:flex;align-items:center;justify-content:center;color:var(--paper-dimmer);cursor:pointer;font-size:15px;}
-  .icon-pick.sel{border-color:var(--sage);color:var(--sage);background:rgba(138,173,127,0.1);}
+  .icon-pick.sel{border-color:var(--sage);color:var(--sage);background:color-mix(in srgb, var(--sage) 10%, transparent);}
+
+  /* Appearance settings */
+  .theme-row{display:flex;gap:10px;}
+  .theme-swatch{flex:1;border-radius:12px;border:2px solid var(--line);padding:10px;cursor:pointer;text-align:center;}
+  .theme-swatch.sel{border-color:var(--sage);}
+  .theme-swatch .preview{height:34px;border-radius:8px;margin-bottom:8px;}
+  .theme-swatch .lbl{font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--paper-dim);}
+  .fs-row{display:flex;gap:10px;}
+  .fs-btn{flex:1;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);color:var(--paper-dimmer);font-family:'IBM Plex Mono',monospace;font-size:12px;cursor:pointer;}
+  .fs-btn.sel{border-color:var(--sage);color:var(--sage);background:color-mix(in srgb, var(--sage) 10%, transparent);}
 </style>
 </head>
 <body>
@@ -217,6 +270,25 @@
   </div>
 
   <div class="view active" id="view-dashboard">
+    <div class="segwrap">
+      <div class="seg" id="dashSeg">
+        <button class="active expense" data-t="expense"><i class="ti ti-arrow-up-right"></i>Expenses</button>
+        <button class="income" data-t="income"><i class="ti ti-arrow-down-left"></i>Income</button>
+        <button class="invest" data-t="investment"><i class="ti ti-chart-line"></i>Invest</button>
+      </div>
+    </div>
+
+    <div class="pie-card">
+      <div class="pie-head">
+        <div class="pie-title" id="pieTitle">All-time by category</div>
+        <div class="pie-sub">lifetime</div>
+      </div>
+      <div class="pie-body">
+        <div class="pie-donut" id="pieDonut"><div class="pie-donut-hole"><div class="t" id="pieTotalVal">₹0</div><div class="l">Total</div></div></div>
+        <div class="pie-legend" id="pieLegend"></div>
+      </div>
+    </div>
+
     <div class="net-hero">
       <div class="net-label">Net this month</div>
       <div class="net-amount" id="netAmount">₹0</div>
@@ -229,14 +301,6 @@
       <div class="stat-card invest"><div class="bar"></div><div class="slabel"><i class="ti ti-chart-line"></i>Invest</div><div class="sval" id="investVal">₹0</div></div>
     </div>
 
-    <div class="segwrap">
-      <div class="seg" id="dashSeg">
-        <button class="active expense" data-t="expense"><i class="ti ti-arrow-up-right"></i>Expenses</button>
-        <button class="income" data-t="income"><i class="ti ti-arrow-down-left"></i>Income</button>
-        <button class="invest" data-t="investment"><i class="ti ti-chart-line"></i>Invest</button>
-      </div>
-    </div>
-
     <div class="section" id="alertsSection">
       <div class="section-head"><div class="section-title">Alerts</div></div>
       <div id="alertsList"></div>
@@ -245,13 +309,32 @@
     <div class="section">
       <div class="section-head">
         <div class="section-title" id="breakdownTitle">Expenses by category</div>
-        <button class="section-link" id="goSetup">manage</button>
+        <span class="section-tag">this month</span>
       </div>
       <div id="categoryLedger"></div>
     </div>
 
     <div class="section">
-      <div class="section-head"><div class="section-title">Recent</div></div>
+      <div class="section-head">
+        <div class="section-title" id="yearTitle">Expenses — year to date</div>
+        <span class="section-tag" id="yearTag">—</span>
+      </div>
+      <div id="yearLedger"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">Sub-categories</div>
+        <span class="section-tag">this month</span>
+      </div>
+      <div class="subcat-table" id="subcatTable"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">Recent</div>
+        <button class="section-link" id="goSetup">manage</button>
+      </div>
       <div id="recentList"></div>
     </div>
   </div>
@@ -263,6 +346,12 @@
       <button class="chip" data-t="expense">Expense</button>
       <button class="chip" data-t="investment">Investment</button>
     </div>
+    <div class="section" style="padding-top:12px;">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn primary" id="exportMonthBtn" style="display:flex;align-items:center;justify-content:center;gap:6px;flex:1 1 auto;"><i class="ti ti-file-spreadsheet"></i>This month</button>
+        <button class="btn" id="exportAllBtn" style="display:flex;align-items:center;justify-content:center;gap:6px;flex:1 1 auto;"><i class="ti ti-download"></i>All data (full workbook)</button>
+      </div>
+    </div>
     <div class="section">
       <div id="allTxnList"></div>
     </div>
@@ -273,6 +362,7 @@
       <div class="setup-tabs">
         <button class="setup-tab active" data-pane="categories">Categories</button>
         <button class="setup-tab" data-pane="targets">Targets</button>
+        <button class="setup-tab" data-pane="appearance">Appearance</button>
       </div>
 
       <div class="setup-pane active" id="pane-categories">
@@ -296,6 +386,20 @@
         </div>
         <div id="budgetEditList"></div>
         <button class="btn primary" id="saveBudgets" style="width:100%;margin-top:6px;">Save targets</button>
+      </div>
+
+      <div class="setup-pane" id="pane-appearance">
+        <div class="section-head" style="margin-top:0;"><div class="section-title" style="font-size:14px;">Color theme</div></div>
+        <div class="theme-row" id="themeRow" style="margin-bottom:22px;">
+          <div class="theme-swatch" data-theme="ledger"><div class="preview" style="background:linear-gradient(135deg,#0B0F0D,#D8B048);"></div><div class="lbl">Ledger</div></div>
+          <div class="theme-swatch" data-theme="ocean"><div class="preview" style="background:linear-gradient(135deg,#070C12,#5FA8E6);"></div><div class="lbl">Ocean</div></div>
+          <div class="theme-swatch" data-theme="sunrise"><div class="preview" style="background:linear-gradient(135deg,#FAF6EC,#B8862F);"></div><div class="lbl">Sunrise</div></div>
+        </div>
+        <div class="section-head"><div class="section-title" style="font-size:14px;">Text size</div></div>
+        <div class="fs-row">
+          <button class="fs-btn" data-fs="normal">Normal</button>
+          <button class="fs-btn" data-fs="large">Large & Bold</button>
+        </div>
       </div>
     </div>
   </div>
@@ -411,6 +515,42 @@ window.storage = (function(){
     async delete(key){ await idbDelete(key); return {key,deleted:true,shared:false}; }
   };
 })();
+
+/* ================= Appearance (not sensitive — stored unencrypted) ================= */
+async function loadPrefs(){
+  try{
+    const p = await window.storage.get('prefs', false);
+    const prefs = JSON.parse(p.value);
+    applyPrefs(prefs);
+  }catch(e){ applyPrefs({theme:'ledger', fontSize:'normal'}); }
+}
+function applyPrefs(prefs){
+  const html = document.getElementById('htmlRoot');
+  html.classList.remove('theme-ocean','theme-sunrise','text-large');
+  if(prefs.theme==='ocean') html.classList.add('theme-ocean');
+  if(prefs.theme==='sunrise') html.classList.add('theme-sunrise');
+  if(prefs.fontSize==='large') html.classList.add('text-large');
+  document.querySelectorAll('.theme-swatch').forEach(el=> el.classList.toggle('sel', el.getAttribute('data-theme')===(prefs.theme||'ledger')));
+  document.querySelectorAll('.fs-btn').forEach(el=> el.classList.toggle('sel', el.getAttribute('data-fs')===(prefs.fontSize||'normal')));
+  window.currentPrefs = prefs;
+}
+async function savePrefs(prefs){
+  window.currentPrefs = prefs;
+  applyPrefs(prefs);
+  await window.storage.set('prefs', JSON.stringify(prefs), false);
+}
+loadPrefs();
+document.getElementById('themeRow').addEventListener('click',(e)=>{
+  const el = e.target.closest('.theme-swatch'); if(!el) return;
+  const prefs = {...(window.currentPrefs||{theme:'ledger',fontSize:'normal'}), theme: el.getAttribute('data-theme')};
+  savePrefs(prefs);
+});
+document.querySelectorAll('.fs-btn').forEach(btn=>{
+  btn.onclick = ()=>{
+    const prefs = {...(window.currentPrefs||{theme:'ledger',fontSize:'normal'}), fontSize: btn.getAttribute('data-fs')};
+    savePrefs(prefs);
+  };
+});
 
 const ICON_PALETTE = ['ti-tools-kitchen-2','ti-car','ti-shopping-bag','ti-file-invoice','ti-heart-rate-monitor','ti-movie','ti-home','ti-plane','ti-school','ti-device-mobile','ti-paw','ti-briefcase','ti-cash','ti-gift','ti-building-bank','ti-coin','ti-chart-line','ti-piggy-bank','ti-diamond','ti-dots','ti-bolt','ti-wifi','ti-bottle','ti-shirt'];
 
@@ -572,17 +712,21 @@ boot();
 document.addEventListener('visibilitychange', ()=>{ if(document.hidden && appRoot.style.display==='block'){ document.getElementById('lockNowBtn').click(); } });
 
 const TYPE_META = {
-  income:{color:'income', label:'Income', icon:'ti-arrow-down-left'},
-  expense:{color:'expense', label:'Expense', icon:'ti-arrow-up-right'},
-  investment:{color:'invest', label:'Investment', icon:'ti-chart-line'}
+  income:{color:'income', label:'Income', icon:'ti-arrow-down-left', hex:'--income'},
+  expense:{color:'expense', label:'Expense', icon:'ti-arrow-up-right', hex:'--expense'},
+  investment:{color:'invest', label:'Investment', icon:'ti-chart-line', hex:'--invest'}
 };
 const fmt = n => '₹' + Math.round(n).toLocaleString('en-IN');
 const monthKey = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
 const monthLabelStr = d => d.toLocaleDateString('en-US',{month:'short',year:'numeric'});
 function txnsForMonth(){ const mk=monthKey(currentMonth); return state.txns.filter(t=>t.date.startsWith(mk)); }
+function txnsForYear(){ const y=String(currentMonth.getFullYear()); return state.txns.filter(t=>t.date.startsWith(y)); }
 function catsFor(type){ return state.categories[type] || []; }
 function catInfo(type, catId){ return catsFor(type).find(c=>c.id===catId) || {id:'other', label:'Other', icon:'ti-dots', subs:[]}; }
 function subInfo(type, catId, subId){ const c = catInfo(type,catId); return (c.subs||[]).find(s=>s.id===subId); }
+
+/* A small fixed palette for pie slices (works across all themes) */
+const PIE_COLORS = ['#E2794A','#7FC49A','#5FB4C9','#D8B048','#B08AD9','#E0708A','#8AAD7F','#C97A3E','#4FA0B0','#D6A94A'];
 
 function render(){
   document.getElementById('monthLabel').textContent = monthLabelStr(currentMonth);
@@ -622,9 +766,7 @@ function render(){
     const txnsInCat = monthTxns.filter(t=>t.type===dashType && t.catId===c.id);
     const spent = txnsInCat.reduce((s,t)=>s+t.amount,0);
     const catTarget = dashType==='expense' ? (state.targets.byCat[c.id]||0) : 0;
-    const subTotals = {};
-    txnsInCat.forEach(t=>{ if(t.subId){ subTotals[t.subId] = (subTotals[t.subId]||0) + t.amount; } });
-    return {...c, spent, target: catTarget, subTotals};
+    return {...c, spent, target: catTarget};
   }).filter(c=>c.spent>0 || c.target>0).sort((a,b)=>b.spent-a.spent);
 
   ledgerEl.innerHTML = catList.length===0
@@ -633,10 +775,42 @@ function render(){
         const p = c.target ? Math.min(c.spent/c.target,1) : (c.spent>0?1:0);
         let cls = TYPE_META[dashType].color;
         if(dashType==='expense' && c.target){ cls = c.spent>c.target ? 'over' : (c.spent/c.target>=0.85 ? 'warn' : 'expense'); }
-        const subsHtml = Object.keys(c.subTotals).length
-          ? `<div class="ledger-subs">${Object.entries(c.subTotals).map(([sid,amt])=>{ const s=subInfo(dashType,c.id,sid); return `<span>${s?s.label:'Other'}: <b style="color:var(--paper)">${fmt(amt)}</b></span>`; }).join('')}</div>` : '';
-        return `<div class="ledger-row"><div class="ledger-top"><span class="ledger-name"><i class="ti ${c.icon}"></i>${c.label}</span><span class="ledger-dots"></span><span class="ledger-amt"><b>${fmt(c.spent)}</b>${c.target?' / '+fmt(c.target):''}</span></div><div class="ledger-track"><div class="ledger-fill ${cls}" style="width:${p*100}%"></div></div>${subsHtml}</div>`;
+        return `<div class="ledger-row"><div class="ledger-top"><span class="ledger-name"><i class="ti ${c.icon}"></i>${c.label}</span><span class="ledger-dots"></span><span class="ledger-amt"><b>${fmt(c.spent)}</b>${c.target?' / '+fmt(c.target):''}</span></div><div class="ledger-track"><div class="ledger-fill ${cls}" style="width:${p*100}%"></div></div></div>`;
       }).join('');
+
+  // Year-to-date summary for main categories
+  const yearTxns = txnsForYear();
+  document.getElementById('yearTitle').textContent = `${TYPE_META[dashType].label}s — year to date`;
+  document.getElementById('yearTag').textContent = currentMonth.getFullYear();
+  const yearList = catsFor(dashType).map(c=>{
+    const spent = yearTxns.filter(t=>t.type===dashType && t.catId===c.id).reduce((s,t)=>s+t.amount,0);
+    return {...c, spent};
+  }).filter(c=>c.spent>0).sort((a,b)=>b.spent-a.spent);
+  const yearMax = yearList.length ? yearList[0].spent : 0;
+  document.getElementById('yearLedger').innerHTML = yearList.length===0
+    ? `<div class="empty-alert">No ${TYPE_META[dashType].label.toLowerCase()} recorded yet this year.</div>`
+    : yearList.map(c=>{
+        const p = yearMax ? c.spent/yearMax : 0;
+        return `<div class="ledger-row"><div class="ledger-top"><span class="ledger-name"><i class="ti ${c.icon}"></i>${c.label}</span><span class="ledger-dots"></span><span class="ledger-amt"><b>${fmt(c.spent)}</b></span></div><div class="ledger-track"><div class="ledger-fill ${TYPE_META[dashType].color}" style="width:${p*100}%"></div></div></div>`;
+      }).join('');
+
+  // Sub-category summary for the current month (across selected type)
+  const subTotals = {};
+  monthTxns.filter(t=>t.type===dashType && t.subId).forEach(t=>{
+    const key = t.catId+'::'+t.subId;
+    if(!subTotals[key]) subTotals[key] = {catId:t.catId, subId:t.subId, amt:0};
+    subTotals[key].amt += t.amount;
+  });
+  const subList = Object.values(subTotals).sort((a,b)=>b.amt-a.amt);
+  document.getElementById('subcatTable').innerHTML = subList.length===0
+    ? `<div class="empty-alert" style="padding:14px;">No sub-category detail logged this month.</div>`
+    : subList.map(s=>{
+        const c = catInfo(dashType, s.catId); const sub = subInfo(dashType, s.catId, s.subId);
+        return `<div class="subcat-row"><div class="subcat-left"><span class="subcat-name">${sub?sub.label:'—'}</span><span class="subcat-parent">${c.label}</span></div><div class="subcat-amt" style="color:var(--${TYPE_META[dashType].color==='invest'?'invest':TYPE_META[dashType].color})">${fmt(s.amt)}</div></div>`;
+      }).join('');
+
+  // Pie chart: all-time totals by main category for selected type
+  renderPie(dashType);
 
   const recentEl = document.getElementById('recentList');
   const recent = [...monthTxns].sort((a,b)=>b.date.localeCompare(a.date) || b.id.localeCompare(a.id)).slice(0,6);
@@ -645,6 +819,36 @@ function render(){
   renderHistory();
   renderSetup();
   attachTxnDeleteHandlers();
+}
+
+function renderPie(type){
+  document.getElementById('pieTitle').textContent = `${TYPE_META[type].label}s — all time`;
+  const totals = catsFor(type).map(c=>{
+    const spent = state.txns.filter(t=>t.type===type && t.catId===c.id).reduce((s,t)=>s+t.amount,0);
+    return {...c, spent};
+  }).filter(c=>c.spent>0).sort((a,b)=>b.spent-a.spent);
+  const total = totals.reduce((s,c)=>s+c.spent,0);
+  document.getElementById('pieTotalVal').textContent = total ? fmt(total) : '₹0';
+
+  const donut = document.getElementById('pieDonut');
+  const legend = document.getElementById('pieLegend');
+  if(total===0){
+    donut.style.background = 'conic-gradient(var(--surface-2) 0deg 360deg)';
+    legend.innerHTML = `<div class="empty-alert" style="padding:0;">No ${TYPE_META[type].label.toLowerCase()} data yet.</div>`;
+    return;
+  }
+  let acc = 0;
+  const stops = totals.map((c,i)=>{
+    const startPct = acc/total*360; acc += c.spent;
+    const endPct = acc/total*360;
+    const color = PIE_COLORS[i % PIE_COLORS.length];
+    return `${color} ${startPct}deg ${endPct}deg`;
+  });
+  donut.style.background = `conic-gradient(${stops.join(',')})`;
+  legend.innerHTML = totals.slice(0,6).map((c,i)=>{
+    const pct = Math.round(c.spent/total*100);
+    return `<div class="pie-legend-row"><span class="pie-dot" style="background:${PIE_COLORS[i%PIE_COLORS.length]}"></span><span class="pie-legend-label">${c.label}</span><span class="pie-legend-val">${pct}%</span></div>`;
+  }).join('') + (totals.length>6 ? `<div class="pie-legend-row"><span class="pie-legend-label" style="color:var(--paper-dimmer);font-style:italic;">+${totals.length-6} more</span></div>` : '');
 }
 
 function txnRowHtml(t){
@@ -840,6 +1044,74 @@ document.getElementById('confirmAdd').onclick = async ()=>{
   await saveTxns();
   addBackdrop.classList.remove('open');
   render();
+};
+
+/* ================= Excel export ================= */
+function txnsToRows(txns){
+  const sorted = [...txns].sort((a,b)=>a.date.localeCompare(b.date));
+  return sorted.map(t=>{
+    const c = catInfo(t.type, t.catId);
+    const s = t.subId ? subInfo(t.type, t.catId, t.subId) : null;
+    return { Date: t.date, Type: TYPE_META[t.type].label, Category: c.label, 'Sub-category': s ? s.label : '', Note: t.note || '', Amount: t.amount };
+  });
+}
+function yearlyCategorySummaryRows(){
+  const rows = [];
+  ['expense','income','investment'].forEach(type=>{
+    const byYear = {};
+    state.txns.filter(t=>t.type===type).forEach(t=>{
+      const y = t.date.slice(0,4);
+      const c = catInfo(type, t.catId);
+      byYear[y] = byYear[y] || {};
+      byYear[y][c.label] = (byYear[y][c.label]||0) + t.amount;
+    });
+    Object.keys(byYear).sort().forEach(y=>{
+      Object.entries(byYear[y]).sort((a,b)=>b[1]-a[1]).forEach(([cat,amt])=>{
+        rows.push({ Year:y, Type: TYPE_META[type].label, Category:cat, Total:amt });
+      });
+    });
+  });
+  return rows;
+}
+function monthlySubcategorySummaryRows(){
+  const rows = [];
+  ['expense','income','investment'].forEach(type=>{
+    const byMonth = {};
+    state.txns.filter(t=>t.type===type && t.subId).forEach(t=>{
+      const m = t.date.slice(0,7);
+      const c = catInfo(type, t.catId); const s = subInfo(type, t.catId, t.subId);
+      const key = m+'::'+c.label+'::'+(s?s.label:'');
+      byMonth[key] = byMonth[key] || {month:m, type:TYPE_META[type].label, category:c.label, sub: s?s.label:'', amt:0};
+      byMonth[key].amt += t.amount;
+    });
+    Object.values(byMonth).sort((a,b)=> a.month.localeCompare(b.month) || b.amt-a.amt).forEach(r=>{
+      rows.push({ Month:r.month, Type:r.type, Category:r.category, 'Sub-category':r.sub, Total:r.amt });
+    });
+  });
+  return rows;
+}
+function downloadWorkbook(sheets, filename){
+  const wb = XLSX.utils.book_new();
+  sheets.forEach(({name, rows})=>{
+    if(rows.length===0) rows = [{Info:'No data'}];
+    const ws = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, name);
+  });
+  XLSX.writeFile(wb, filename);
+}
+document.getElementById('exportMonthBtn').onclick = ()=>{
+  const rows = txnsToRows(txnsForMonth());
+  if(rows.length===0){ alert('No transactions to export for this month.'); return; }
+  downloadWorkbook([{name:'Transactions', rows}], `ledger-${monthKey(currentMonth)}.xlsx`);
+};
+document.getElementById('exportAllBtn').onclick = ()=>{
+  if(state.txns.length===0){ alert('No transactions to export yet.'); return; }
+  const stamp = new Date().toISOString().slice(0,10);
+  downloadWorkbook([
+    {name:'Transactions', rows: txnsToRows(state.txns)},
+    {name:'Yearly by Category', rows: yearlyCategorySummaryRows()},
+    {name:'Monthly by Sub-category', rows: monthlySubcategorySummaryRows()}
+  ], `ledger-full-export-${stamp}.xlsx`);
 };
 </script>
 </body>
