@@ -247,9 +247,14 @@
   .fs-row{display:flex;gap:10px;}
   .fs-btn{flex:1;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);color:var(--paper-dimmer);font-family:'IBM Plex Mono',monospace;font-size:12px;cursor:pointer;}
   .fs-btn.sel{border-color:var(--sage);color:var(--sage);background:color-mix(in srgb, var(--sage) 10%, transparent);}
+
+  .toast{position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-60px);max-width:380px;width:calc(100% - 32px);background:var(--surface-3);border:1px solid var(--sage);color:var(--paper);border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:10px;font-size:13px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,0.4);opacity:0;transition:transform .35s ease, opacity .35s ease;pointer-events:none;}
+  .toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
+  .toast i{color:var(--sage);font-size:18px;flex-shrink:0;}
 </style>
 </head>
 <body>
+<div class="toast" id="backupToast"><i class="ti ti-cloud-check"></i><span id="backupToastText"></span></div>
 <div class="app" id="appRoot" style="display:none;">
 
   <div class="header">
@@ -417,6 +422,10 @@
       <div class="security-row">
         <div><span>Data encryption</span><small>AES-256, key derived from your PIN</small></div>
         <i class="ti ti-shield-check" style="color:var(--sage);font-size:20px;"></i>
+      </div>
+      <div class="security-row">
+        <div><span>Local backup</span><small id="lastBackupText">Auto-backs up every 7 days</small></div>
+        <button class="btn" id="backupNowBtn" style="flex:none;padding:8px 14px;">Backup now</button>
       </div>
       <button class="btn danger" id="resetAppBtn" style="width:100%;">Reset app and erase all data</button>
     </div>
@@ -720,7 +729,14 @@ async function onPinComplete(){
     }
   }
 }
-function unlockAndShowApp(){ lockScreen.style.display='none'; appRoot.style.display='block'; render(); }
+function unlockAndShowApp(){ lockScreen.style.display='none'; appRoot.style.display='block'; render(); maybeAutoBackup(); }
+function showToast(msg){
+  const t = document.getElementById('backupToast');
+  document.getElementById('backupToastText').textContent = msg;
+  t.classList.add('show');
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(()=> t.classList.remove('show'), 4000);
+}
 document.getElementById('lockNowBtn').onclick = ()=>{
   appRoot.style.display='none'; lockScreen.style.display='flex';
   lockIconEl.className='ti ti-lock'; lockTitle.textContent='Enter your PIN'; lockSub.textContent='Unlock your ledger.'; lockErr.textContent='';
@@ -868,6 +884,7 @@ function render(){
 
   renderHistory();
   renderSetup();
+  updateLastBackupText();
   attachTxnDeleteHandlers();
 }
 
@@ -1215,6 +1232,43 @@ document.getElementById('exportAllBtn').onclick = ()=>{
     {name:'Monthly by Sub-category', rows: monthlySubcategorySummaryRows()}
   ], `ledger-full-export-${stamp}.xlsx`);
 };
+
+/* ================= Auto-backup ================= */
+const BACKUP_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+function updateLastBackupText(){
+  const el = document.getElementById('lastBackupText');
+  if(!el) return;
+  const last = window.currentPrefs && window.currentPrefs.lastBackupAt;
+  if(!last){ el.textContent = 'No backup yet — auto-backs up every 7 days'; return; }
+  const d = new Date(last);
+  el.textContent = `Last backup: ${d.toLocaleDateString('en-US',{month:'short',day:'numeric'})} at ${d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}`;
+}
+
+async function doBackup(isAuto){
+  if(state.txns.length===0){
+    if(!isAuto) alert('No transactions to back up yet.');
+    return;
+  }
+  const stamp = new Date().toISOString().slice(0,10);
+  downloadWorkbook([
+    {name:'Transactions', rows: txnsToRows(state.txns)},
+    {name:'Yearly by Category', rows: yearlyCategorySummaryRows()},
+    {name:'Monthly by Sub-category', rows: monthlySubcategorySummaryRows()}
+  ], `ledger-backup-${stamp}.xlsx`);
+  const prefs = {...(window.currentPrefs||{theme:'ledger',fontSize:'normal'}), lastBackupAt: Date.now()};
+  await savePrefs(prefs);
+  updateLastBackupText();
+  showToast(isAuto ? 'Weekly backup downloaded automatically — keep it somewhere safe' : 'Backup downloaded');
+}
+function maybeAutoBackup(){
+  const last = window.currentPrefs && window.currentPrefs.lastBackupAt;
+  if(!last || (Date.now() - last) > BACKUP_INTERVAL_MS){
+    setTimeout(()=> doBackup(true), 1200); // slight delay so it doesn't collide with unlock animation
+  }
+  updateLastBackupText();
+}
+document.getElementById('backupNowBtn').onclick = ()=> doBackup(false);
 
 /* ================= Import bank statement ================= */
 let importRows = [];
