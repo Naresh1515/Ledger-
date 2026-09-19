@@ -357,6 +357,7 @@
         <button class="btn primary" id="exportMonthBtn" style="display:flex;align-items:center;justify-content:center;gap:6px;flex:1 1 auto;"><i class="ti ti-file-spreadsheet"></i>This month</button>
         <button class="btn" id="exportAllBtn" style="display:flex;align-items:center;justify-content:center;gap:6px;flex:1 1 auto;"><i class="ti ti-download"></i>All data (full workbook)</button>
       </div>
+      <button class="btn" id="pasteSmsBtn" style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;border-color:var(--sage);color:var(--sage);margin-bottom:10px;"><i class="ti ti-message-2"></i>Paste from bank SMS</button>
       <button class="btn" id="importBtn" style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;border-color:var(--gold);color:var(--gold);"><i class="ti ti-upload"></i>Import bank statement (Excel/CSV)</button>
       <input type="file" id="importFileInput" accept=".xlsx,.xls,.csv" style="display:none;">
     </div>
@@ -424,6 +425,10 @@
         <i class="ti ti-shield-check" style="color:var(--sage);font-size:20px;"></i>
       </div>
       <div class="security-row">
+        <div><span>Storage protection</span><small id="persistText">Checking…</small></div>
+        <i class="ti ti-database" style="color:var(--paper-dim);font-size:20px;"></i>
+      </div>
+      <div class="security-row">
         <div><span>Local backup</span><small id="lastBackupText">Auto-backs up every 7 days</small></div>
         <button class="btn" id="backupNowBtn" style="flex:none;padding:8px 14px;">Backup now</button>
       </div>
@@ -461,6 +466,20 @@
       <button class="btn danger" id="deleteInSheet" style="display:none;flex:none;padding:12px 16px;"><i class="ti ti-trash"></i></button>
       <button class="btn" id="cancelAdd">Cancel</button>
       <button class="btn primary" id="confirmAdd">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="sheet-backdrop" id="pasteSmsBackdrop">
+  <div class="sheet">
+    <h3>Paste bank message</h3>
+    <p style="font-size:12.5px;color:var(--paper-dimmer);margin:-10px 0 16px;">Copy the SMS or notification text from your bank, then paste it below. We'll try to pull out the amount, date, and merchant — you'll get to review before saving.</p>
+    <div class="field">
+      <textarea id="smsPasteInput" rows="5" placeholder="e.g. Rs.1,250.00 debited from A/c XX1234 on 18-Sep-26 at SWIGGY. Avl bal Rs.24,500.00" style="width:100%;background:var(--surface-2);border:1px solid var(--line);color:var(--paper);border-radius:9px;padding:10px 12px;font-size:14px;font-family:'Inter',sans-serif;resize:vertical;"></textarea>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn" id="cancelPasteSms">Cancel</button>
+      <button class="btn primary" id="parseSmsBtn">Parse message</button>
     </div>
   </div>
 </div>
@@ -729,7 +748,29 @@ async function onPinComplete(){
     }
   }
 }
-function unlockAndShowApp(){ lockScreen.style.display='none'; appRoot.style.display='block'; render(); maybeAutoBackup(); }
+function unlockAndShowApp(){ lockScreen.style.display='none'; appRoot.style.display='block'; render(); maybeAutoBackup(); ensurePersistentStorage(); }
+async function ensurePersistentStorage(){
+  try{
+    if(navigator.storage && navigator.storage.persist){
+      const already = await navigator.storage.persisted();
+      window._storagePersisted = already;
+      if(!already){
+        const granted = await navigator.storage.persist();
+        window._storagePersisted = granted;
+      }
+    } else {
+      window._storagePersisted = null; // API not supported on this browser
+    }
+  }catch(e){ window._storagePersisted = null; }
+  updatePersistenceText();
+}
+function updatePersistenceText(){
+  const el = document.getElementById('persistText');
+  if(!el) return;
+  if(window._storagePersisted===true) el.innerHTML = `<span style="color:var(--sage);">Protected</span> — this browser won't auto-clear your data`;
+  else if(window._storagePersisted===false) el.innerHTML = `<span style="color:var(--gold);">Not protected</span> — data may be cleared under storage pressure`;
+  else el.textContent = 'Not supported by this browser';
+}
 function showToast(msg){
   const t = document.getElementById('backupToast');
   document.getElementById('backupToastText').textContent = msg;
@@ -1138,6 +1179,25 @@ function openEditSheet(txn){
   renderCatGrid();
   addBackdrop.classList.add('open');
 }
+function openAddSheetPrefilled(parsed){
+  editingTxnId = null;
+  document.getElementById('sheetTitle').textContent = 'Confirm parsed transaction';
+  document.getElementById('deleteInSheet').style.display = 'none';
+  document.getElementById('inAmount').value = parsed.amount || '';
+  document.getElementById('inNote').value = parsed.note || '';
+  document.getElementById('inDate').value = parsed.date || todayStr();
+  addType = parsed.type || 'expense';
+  document.querySelectorAll('#typeToggle .type-btn').forEach(b=>b.classList.remove('sel'));
+  document.querySelector(`#typeToggle .type-btn[data-t="${addType}"]`).classList.add('sel');
+
+  selectedCat = null; selectedSub = null;
+  if(parsed.catLabel){
+    const match = catsFor(addType).find(c=> c.label.toLowerCase()===parsed.catLabel.toLowerCase());
+    if(match) selectedCat = match.id;
+  }
+  renderCatGrid();
+  addBackdrop.classList.add('open');
+}
 document.getElementById('fabAdd').onclick = openAddSheet;
 document.getElementById('cancelAdd').onclick = ()=> addBackdrop.classList.remove('open');
 addBackdrop.onclick = (e)=>{ if(e.target===addBackdrop) addBackdrop.classList.remove('open'); };
@@ -1269,6 +1329,100 @@ function maybeAutoBackup(){
   updateLastBackupText();
 }
 document.getElementById('backupNowBtn').onclick = ()=> doBackup(false);
+
+/* ================= Paste-and-parse bank SMS ================= */
+const pasteSmsBackdrop = document.getElementById('pasteSmsBackdrop');
+document.getElementById('pasteSmsBtn').onclick = ()=>{
+  document.getElementById('smsPasteInput').value = '';
+  pasteSmsBackdrop.classList.add('open');
+  setTimeout(()=> document.getElementById('smsPasteInput').focus(), 150);
+};
+document.getElementById('cancelPasteSms').onclick = ()=> pasteSmsBackdrop.classList.remove('open');
+pasteSmsBackdrop.onclick = (e)=>{ if(e.target===pasteSmsBackdrop) pasteSmsBackdrop.classList.remove('open'); };
+
+// Keyword map: merchant/keyword -> {type, catLabel} guess. Matched case-insensitively against the message.
+const SMS_CATEGORY_HINTS = [
+  {kw:['swiggy','zomato','dominos','mcdonald','kfc','restaurant','cafe','starbucks'], type:'expense', cat:'Food'},
+  {kw:['uber','ola','rapido','irctc','indigo','vistara','fuel','petrol','diesel','metro'], type:'expense', cat:'Transport'},
+  {kw:['amazon','flipkart','myntra','ajio','shopping mall'], type:'expense', cat:'Shopping'},
+  {kw:['electricity','bescom','broadband','airtel','jio','vi bill','wifi','internet bill','rent'], type:'expense', cat:'Bills'},
+  {kw:['pharmacy','hospital','clinic','apollo','medplus','doctor'], type:'expense', cat:'Health'},
+  {kw:['netflix','spotify','bookmyshow','pvr','inox','prime video','hotstar'], type:'expense', cat:'Fun'},
+  {kw:['salary','payroll','sal credit'], type:'income', cat:'Salary'},
+  {kw:['interest credited','int.credit','int credit'], type:'income', cat:'Interest'},
+  {kw:['mutual fund','sip','zerodha','groww','upstox','folio'], type:'investment', cat:'Mutual Funds'},
+  {kw:['fixed deposit',' fd ','recurring deposit',' rd '], type:'investment', cat:'FD / RD'}
+];
+
+function parseSmsText(text){
+  const raw = text.trim();
+  const lower = raw.toLowerCase();
+
+  // --- amount ---
+  let amount = null;
+  const amtMatch = raw.match(/(?:rs\.?|inr|₹)\s?([0-9,]+(?:\.[0-9]{1,2})?)/i);
+  if(amtMatch) amount = parseFloat(amtMatch[1].replace(/,/g,''));
+  if(!amount){
+    const bare = raw.match(/\b([0-9]{2,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?)\b/);
+    if(bare) amount = parseFloat(bare[1].replace(/,/g,''));
+  }
+
+  // --- type ---
+  let type = 'expense';
+  if(/\b(credited|received|deposit(ed)?|refund(ed)?)\b/i.test(raw)) type = 'income';
+  if(/\b(debited|spent|paid|purchase|withdrawn|payment of)\b/i.test(raw)) type = 'expense';
+  if(/\b(invest(ed|ment)?|sip|mutual fund|folio)\b/i.test(raw)) type = 'investment';
+
+  // --- date ---
+  let date = todayStr();
+  const monthNames = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+  let dm = raw.match(/(\d{1,2})[-\/\s]([A-Za-z]{3,9})[-\/\s](\d{2,4})/);
+  if(dm){
+    const day = dm[1].padStart(2,'0');
+    const mon = monthNames[dm[2].toLowerCase().slice(0,3)];
+    let yr = dm[3]; if(yr.length===2) yr = '20'+yr;
+    if(mon) date = `${yr}-${String(mon).padStart(2,'0')}-${day}`;
+  } else {
+    dm = raw.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+    if(dm){
+      let [_, a, b, y] = dm; if(y.length===2) y = '20'+y;
+      date = `${y}-${b.padStart(2,'0')}-${a.padStart(2,'0')}`;
+    }
+  }
+
+  // --- merchant / note ---
+  let note = '';
+  let m = raw.match(/\b(?:at|to|towards|for)\s+([A-Za-z0-9&.\-_' ]{3,30})/i);
+  if(m) note = m[1].trim().replace(/\s+(on|dated|avl|available|bal).*$/i,'').trim();
+  if(!note){
+    // fallback: strip common boilerplate and take a short chunk
+    note = raw.replace(/rs\.?\s?[0-9,.]+/gi,'').replace(/a\/c\s?[x0-9]+/gi,'').slice(0,40).trim();
+  }
+
+  // --- category guess ---
+  let catLabel = null;
+  for(const hint of SMS_CATEGORY_HINTS){
+    if(hint.kw.some(k=> lower.includes(k))){
+      if(hint.type){ /* keep detected type unless hint disagrees strongly */ }
+      catLabel = hint.cat;
+      if(!dm && hint.type) type = type; // no-op, type already set above; category hints don't override type detection
+      break;
+    }
+  }
+
+  return {amount, type, date, note, catLabel};
+}
+
+document.getElementById('parseSmsBtn').onclick = ()=>{
+  const text = document.getElementById('smsPasteInput').value;
+  if(!text.trim()){ alert('Paste a message first.'); return; }
+  const parsed = parseSmsText(text);
+  if(!parsed.amount){
+    alert("Couldn't find an amount in that message. You can still fill it in manually on the next screen.");
+  }
+  pasteSmsBackdrop.classList.remove('open');
+  openAddSheetPrefilled(parsed);
+};
 
 /* ================= Import bank statement ================= */
 let importRows = [];
