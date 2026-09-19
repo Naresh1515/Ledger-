@@ -255,6 +255,7 @@
 </head>
 <body>
 <div class="toast" id="backupToast"><i class="ti ti-cloud-check"></i><span id="backupToastText"></span></div>
+<div class="toast" id="undoToast"><i class="ti ti-trash"></i><span id="undoToastText">Transaction deleted</span><button id="undoBtn" style="margin-left:auto;background:none;border:1px solid var(--sage);color:var(--sage);border-radius:8px;padding:5px 12px;font-size:12px;font-family:'IBM Plex Mono',monospace;cursor:pointer;pointer-events:auto;">Undo</button></div>
 <div class="app" id="appRoot" style="display:none;">
 
   <div class="header">
@@ -779,6 +780,7 @@ function showToast(msg){
   window._toastTimer = setTimeout(()=> t.classList.remove('show'), 4000);
 }
 document.getElementById('lockNowBtn').onclick = ()=>{
+  finalizePendingDelete();
   appRoot.style.display='none'; lockScreen.style.display='flex';
   lockIconEl.className='ti ti-lock'; lockTitle.textContent='Enter your PIN'; lockSub.textContent='Unlock your ledger.'; lockErr.textContent='';
   pinBuffer=''; firstPinEntry=null; mode='unlock'; renderDots();
@@ -969,7 +971,7 @@ function txnRowHtml(t){
 }
 function attachTxnDeleteHandlers(){
   document.querySelectorAll('.txn-del').forEach(btn=>{
-    btn.onclick = async (e)=>{ e.stopPropagation(); state.txns = state.txns.filter(t=>t.id!==btn.getAttribute('data-id')); await saveTxns(); render(); };
+    btn.onclick = (e)=>{ e.stopPropagation(); requestDeleteTxn(btn.getAttribute('data-id')); };
   });
   document.querySelectorAll('.txn-edit').forEach(el=>{
     el.onclick = ()=>{
@@ -978,6 +980,52 @@ function attachTxnDeleteHandlers(){
     };
   });
 }
+
+/* ================= Delete with confirm + undo window ================= */
+let pendingDelete = null; // {txn, index, timerId}
+
+function requestDeleteTxn(id){
+  const t = state.txns.find(x=>x.id===id);
+  if(!t) return;
+  const label = t.note || catInfo(t.type, t.catId).label;
+  if(!confirm(`Delete "${label}" — ${fmt(t.amount)}? You'll have a few seconds to undo.`)) return;
+  deleteTxnWithUndo(id);
+}
+function deleteTxnWithUndo(id){
+  finalizePendingDelete(); // commit any earlier pending delete first
+  const idx = state.txns.findIndex(t=>t.id===id);
+  if(idx===-1) return;
+  const txn = state.txns[idx];
+  state.txns.splice(idx,1);
+  pendingDelete = { txn, index: idx };
+  render();
+  showUndoToast();
+  pendingDelete.timerId = setTimeout(()=> finalizePendingDelete(), 6000);
+}
+function finalizePendingDelete(){
+  if(!pendingDelete) return;
+  clearTimeout(pendingDelete.timerId);
+  pendingDelete = null;
+  hideUndoToast();
+  saveTxns();
+}
+function undoDelete(){
+  if(!pendingDelete) return;
+  clearTimeout(pendingDelete.timerId);
+  state.txns.splice(pendingDelete.index, 0, pendingDelete.txn);
+  pendingDelete = null;
+  hideUndoToast();
+  render();
+}
+function showUndoToast(){
+  const t = document.getElementById('undoToast');
+  document.getElementById('undoToastText').textContent = 'Transaction deleted';
+  t.classList.add('show');
+}
+function hideUndoToast(){
+  document.getElementById('undoToast').classList.remove('show');
+}
+document.getElementById('undoBtn').onclick = undoDelete;
 
 function renderHistory(){
   const monthTxns = txnsForMonth();
@@ -1218,11 +1266,8 @@ document.getElementById('confirmAdd').onclick = async ()=>{
 };
 document.getElementById('deleteInSheet').onclick = async ()=>{
   if(!editingTxnId) return;
-  if(!confirm('Delete this transaction?')) return;
-  state.txns = state.txns.filter(t=>t.id!==editingTxnId);
-  await saveTxns();
   addBackdrop.classList.remove('open');
-  render();
+  requestDeleteTxn(editingTxnId);
 };
 
 /* ================= Excel export ================= */
