@@ -491,6 +491,20 @@
   </div>
 </div>
 
+<div class="sheet-backdrop" id="voiceDictateBackdrop">
+  <div class="sheet">
+    <h3><i class="ti ti-microphone" style="color:var(--invest);"></i> Add by voice</h3>
+    <p style="font-size:12.5px;color:var(--paper-dimmer);margin:-10px 0 16px;">Your browser can't listen automatically, but you can still use your keyboard's dictation mic. Tap into the box below, then tap the <b>microphone icon on your keyboard</b> and speak — then tap Parse.</p>
+    <div class="field">
+      <textarea id="voiceDictateInput" rows="4" placeholder='e.g. "spent 250 on food lunch today"' style="width:100%;background:var(--surface-2);border:1px solid var(--line);color:var(--paper);border-radius:9px;padding:10px 12px;font-size:15px;font-family:'Inter',sans-serif;resize:vertical;"></textarea>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn" id="cancelVoiceDictate">Cancel</button>
+      <button class="btn primary" id="parseDictateBtn">Parse</button>
+    </div>
+  </div>
+</div>
+
 <div class="sheet-backdrop" id="pasteSmsBackdrop">
   <div class="sheet">
     <h3>Paste bank message</h3>
@@ -1488,10 +1502,14 @@ let activeRecognition = null;
 function getSpeechRecognitionClass(){
   return window.SpeechRecognition || window.webkitSpeechRecognition || null;
 }
+const voiceDictateBackdrop = document.getElementById('voiceDictateBackdrop');
 document.getElementById('voiceAddBtn').onclick = ()=>{
   const SR = getSpeechRecognitionClass();
   if(!SR){
-    alert("Voice input isn't supported in this browser. It generally works in Chrome on Android, but not in Safari on iPhone.");
+    // Safari/iOS: no in-page auto-listen API — fall back to keyboard dictation mic
+    document.getElementById('voiceDictateInput').value = '';
+    voiceDictateBackdrop.classList.add('open');
+    setTimeout(()=> document.getElementById('voiceDictateInput').focus(), 150);
     return;
   }
   document.getElementById('voiceTranscript').textContent = '';
@@ -1531,6 +1549,18 @@ function finishVoiceCapture(transcript){
 document.getElementById('cancelVoice').onclick = ()=>{
   if(activeRecognition){ try{ activeRecognition.stop(); }catch(e){} activeRecognition=null; }
   voiceBackdrop.classList.remove('open');
+};
+document.getElementById('cancelVoiceDictate').onclick = ()=> voiceDictateBackdrop.classList.remove('open');
+voiceDictateBackdrop.onclick = (e)=>{ if(e.target===voiceDictateBackdrop) voiceDictateBackdrop.classList.remove('open'); };
+document.getElementById('parseDictateBtn').onclick = ()=>{
+  const text = document.getElementById('voiceDictateInput').value;
+  voiceDictateBackdrop.classList.remove('open');
+  if(!text || !text.trim()) return;
+  const parsed = parseSpokenText(text);
+  if(!parsed.amount){
+    alert("Couldn't catch an amount in that. You can fill it in on the next screen.");
+  }
+  openAddSheetPrefilled(parsed, 'Confirm voice transaction');
 };
 
 function parseSpokenText(text){
